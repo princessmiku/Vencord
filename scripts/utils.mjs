@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ */
 
 /**
  * @param {string} filePath
@@ -24,7 +24,11 @@ export function getPluginTarget(filePath) {
     const pathParts = filePath.split(/[/\\]/);
     if (/^index\.tsx?$/.test(pathParts.at(-1))) pathParts.pop();
 
-    const identifier = pathParts.at(-1).replace(/\.tsx?$/, "");
+    const lastPart = pathParts.at(-1);
+    if (!lastPart) return null;
+
+    const identifier = lastPart.replace(/\.tsx?$/, "");
     const identiferBits = identifier.split(".");
     return identiferBits.length === 1 ? null : identiferBits.at(-1);
 }
+
