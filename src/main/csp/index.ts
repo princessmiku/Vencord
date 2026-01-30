@@ -19,6 +19,7 @@ export const ImageScriptsAndCssSrc = [...ImageAndCssSrc, "script-src", "worker-s
 // script and just adding to it. But generally, you should just edit this file instead
 
 export const CspPolicies: PolicyMap = {
+    "https://www.midevelopment.de": ImageAndCssSrc, // GIF API
     "http://localhost:*": ImageAndCssSrc,
     "http://127.0.0.1:*": ImageAndCssSrc,
     "localhost:*": ImageAndCssSrc,
@@ -63,6 +64,7 @@ export const CspPolicies: PolicyMap = {
     "dearrow-thumb.ajay.app": ImageSrc, // Dearrow Thumbnail CDN
     "usrbg.is-hardly.online": ImageSrc, // USRBG API
     "icons.duckduckgo.com": ImageSrc, // DuckDuckGo Favicon API (Reverse Image Search)
+
 };
 
 const findHeader = (headers: PolicyMap, headerName: Lowercase<string>) => {
