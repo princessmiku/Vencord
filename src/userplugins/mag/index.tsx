@@ -9,13 +9,13 @@ import { ReplyIcon } from "@components/Icons";
 import { sendMessage } from "@utils/discord";
 import { relaunch } from "@utils/native";
 import definePlugin, { OptionType } from "@utils/types";
+import { findCssClassesLazy } from "@webpack";
 import {
     Alerts,
     Button,
     createRoot,
     ExpressionPickerStore,
     React,
-    ScrollerThin,
     SelectedChannelStore,
     Toasts,
     useCallback,
@@ -38,6 +38,7 @@ const MAM_PANEL_ID_ATTR = "data-vc-mam-panel-id";
 const MAM_TAB_ID_ATTR = "data-vc-mam-tab-id";
 const MAM_OWNER_ATTR = "data-vc-mam-owner";
 const API_BASE_URL = "https://www.midevelopment.de/";
+const scrollerClasses = findCssClassesLazy("scrollerBase", "thin", "fade");
 
 type MamRoot = { render: (node: React.ReactNode) => void; unmount: () => void; };
 type MagGif = {
@@ -104,6 +105,7 @@ let panelIdCounter = 0;
  */
 function MamView() {
     const { apiKey } = settings.use(["apiKey"]);
+
     // Search related state.  Only used when no list is selected.
     const [query, setQuery] = useState("");
     const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -249,7 +251,7 @@ function MamView() {
             allUrl.searchParams.set("page", "1");
             allUrl.searchParams.set("nsfw", "false");
             allUrl.searchParams.set("visibility", "published");
-            previews["all"] = await fetchFirstGif(allUrl);
+            previews.all = await fetchFirstGif(allUrl);
             // Fetch preview for each list.  Use list id as string key.
             for (const entry of lists) {
                 const url = new URL(`/api/gif-lists/${entry.id}/items`, API_BASE_URL);
@@ -456,7 +458,7 @@ function MamView() {
     }
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
             {/* Search bar */}
             <div style={{ padding: "8px 12px", display: "flex", gap: 8, alignItems: "center" }}>
                 {viewMode !== "categories" ? (
@@ -549,7 +551,7 @@ function MamView() {
             ) : null}
 
             {/* Content area: either category grid or GIF grid */}
-            <ScrollerThin fade style={{ flex: 1 }}>
+            <div style={{ flex: 1, overflow: "auto" }} className={`${scrollerClasses.scrollerBase} ${scrollerClasses.thin} ${scrollerClasses.fade}`}>
                 <div style={{ padding: "8px 16px 12px" }}>
                     {showCategories ? (
                         <div
@@ -565,7 +567,8 @@ function MamView() {
                         <div
                             style={{
                                 columnWidth: 140,
-                                columnGap: 8
+                                columnGap: 8,
+                                width: "100%"
                             }}
                         >
                             {!loading && !error && items.length === 0 ? (
@@ -606,7 +609,7 @@ function MamView() {
                         </div>
                     )}
                 </div>
-            </ScrollerThin>
+            </div>
 
             {/* Pagination controls: only show when viewing GIF grid */}
             {!showCategories ? (
@@ -725,6 +728,7 @@ function ensureMamPanel(samplePanel: HTMLElement, panelId: string): HTMLElement 
         mamPanel.setAttribute("role", "tabpanel");
         mamPanel.id = panelId;
         mamPanel.style.display = "none";
+        mamPanel.style.overflow = "hidden";
         mamPanel.innerHTML = "";
         panelContainer.appendChild(mamPanel);
         const root = createRoot(mamPanel) as MamRoot;
