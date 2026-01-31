@@ -8,7 +8,7 @@ import { definePluginSettings } from "@api/Settings";
 import { sendMessage } from "@utils/discord";
 import { relaunch } from "@utils/native";
 import definePlugin, { OptionType } from "@utils/types";
-import { Alerts, Button, ExpressionPickerStore, React, SelectedChannelStore, TextInput, Toasts, createRoot, useCallback, useEffect, useRef, useState } from "@webpack/common";
+import { Alerts, Button, createRoot, ExpressionPickerStore, React, SelectedChannelStore, TextInput, Toasts, useCallback, useEffect, useRef, useState } from "@webpack/common";
 
 const MAM_LABEL = "MAM";
 const MAM_TAB_ATTR = "data-vc-mam-tab";
@@ -33,6 +33,15 @@ type MagResponse = {
         next_page?: number | null;
     };
 };
+
+// Lazy getter to handle cases where the native handler might not be ready yet
+let nativeHandler: any = null;
+function getNative() {
+    if (!nativeHandler) {
+        nativeHandler = (VencordNative as any).pluginHelpers?.Mag;
+    }
+    return nativeHandler;
+}
 
 const cleanupFns = new Set<() => void>();
 const mamRoots = new WeakMap<HTMLElement, MamRoot>();
@@ -82,19 +91,24 @@ function MamView() {
         url.searchParams.set("nsfw", "false");
         url.searchParams.set("visibility", "published");
 
-        fetch(url, {
-            signal: controller.signal,
-            headers: {
-                "X-API-Key": apiKey
+        Promise.resolve().then(async () => {
+            const native = getNative();
+            if (native?.fetchMagApi) {
+                return native.fetchMagApi(url.toString(), {
+                    headers: {
+                        "X-API-Key": apiKey
+                    }
+                });
             }
-        }).then(async res => {
+            throw new Error("Native handler not available. Please ensure you're using Vencord Desktop.");
+        }).then(res => {
             if (!res.ok) {
                 const message = res.status === 401
                     ? "Invalid API key."
                     : `Request failed (${res.status}).`;
                 throw new Error(message);
             }
-            return res.json() as Promise<MagResponse>;
+            return res.data as MagResponse;
         }).then(data => {
             const nextItems = Array.isArray(data.items) ? data.items : [];
             setItems(prev => page === 1 ? nextItems : [...prev, ...nextItems]);
