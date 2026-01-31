@@ -15,6 +15,7 @@ import {
     createRoot,
     ExpressionPickerStore,
     React,
+    ScrollerThin,
     SelectedChannelStore,
     Toasts,
     useCallback,
@@ -548,58 +549,64 @@ function MamView() {
             ) : null}
 
             {/* Content area: either category grid or GIF grid */}
-            <div style={{ flex: 1, overflow: "auto", padding: "8px 12px 12px" }}>
-                {showCategories ? (
-                    <div
-                        style={{
-                            display: "grid",
-                            gap: 8,
-                            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
-                        }}
-                    >
-                        {renderCategoryGrid()}
-                    </div>
-                ) : (
-                    <div
-                        style={{
-                            display: "grid",
-                            gap: 8,
-                            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))"
-                        }}
-                    >
-                        {!loading && !error && items.length === 0 ? (
-                            <div style={{ gridColumn: "1 / -1", opacity: 0.7 }}>
-                                {selectedListId === null ? "No results." : "No items in this list."}
-                            </div>
-                        ) : null}
-                        {items.map(gif => (
-                            <button
-                                key={gif.id}
-                                onClick={() => onSend(gif)}
-                                style={{
-                                    border: "none",
-                                    padding: 0,
-                                    background: "transparent",
-                                    cursor: "pointer"
-                                }}
-                                aria-label="Send GIF"
-                                title="Send GIF"
-                            >
-                                <img
-                                    src={gif.public_url}
-                                    loading="lazy"
+            <ScrollerThin fade style={{ flex: 1 }}>
+                <div style={{ padding: "8px 16px 12px" }}>
+                    {showCategories ? (
+                        <div
+                            style={{
+                                display: "grid",
+                                gap: 8,
+                                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
+                            }}
+                        >
+                            {renderCategoryGrid()}
+                        </div>
+                    ) : (
+                        <div
+                            style={{
+                                columnWidth: 140,
+                                columnGap: 8
+                            }}
+                        >
+                            {!loading && !error && items.length === 0 ? (
+                                <div style={{ width: "100%", display: "block", opacity: 0.7 }}>
+                                    {selectedListId === null ? "No results." : "No items in this list."}
+                                </div>
+                            ) : null}
+                            {items.map(gif => (
+                                <button
+                                    key={gif.id}
+                                    onClick={() => onSend(gif)}
                                     style={{
+                                        border: "none",
+                                        padding: 0,
+                                        background: "transparent",
+                                        cursor: "pointer",
+                                        display: "inline-block",
                                         width: "100%",
-                                        height: 96,
-                                        objectFit: "cover",
-                                        borderRadius: 6
+                                        marginBottom: 8,
+                                        breakInside: "avoid"
                                     }}
-                                />
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
+                                    aria-label="Send GIF"
+                                    title="Send GIF"
+                                >
+                                    <img
+                                        src={gif.public_url}
+                                        loading="lazy"
+                                        style={{
+                                            display: "block",
+                                            width: "100%",
+                                            height: "auto",
+                                            objectFit: "cover",
+                                            borderRadius: 6
+                                        }}
+                                    />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </ScrollerThin>
 
             {/* Pagination controls: only show when viewing GIF grid */}
             {!showCategories ? (
