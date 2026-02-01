@@ -14,6 +14,7 @@ import { findCssClassesLazy } from "@webpack";
 import {
     Alerts,
     Button,
+    ComponentDispatch,
     createRoot,
     ExpressionPickerStore,
     React,
@@ -657,7 +658,9 @@ const MamChatBarButton: ChatBarButtonFactory = ({ isMainChat }) => {
 
     const handleClick = () => {
         // Open the expression picker in GIF mode
-        ExpressionPickerStore.toggleExpressionPicker("gif");
+
+        ComponentDispatch.dispatch("OPEN_EXPRESSION_PICKER", { activeView: "gif" });
+
 
         // Once opened, find and click the MAM tab
         setTimeout(() => {
