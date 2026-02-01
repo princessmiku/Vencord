@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { definePluginSettings } from "@api/Settings";
 import { ReplyIcon } from "@components/Icons";
 import { sendMessage } from "@utils/discord";
@@ -636,6 +637,51 @@ const settings = definePluginSettings({
     },
 });
 
+/**
+ * Icon component for the MAM chat bar button.
+ * Shows a simple image/gallery icon.
+ */
+const MamIcon = () => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+    </svg>
+);
+
+/**
+ * Chat bar button factory for opening the MAM picker.
+ * This creates a button in the chat bar that opens the MAM GIF picker
+ * similar to how the Translate plugin works.
+ */
+const MamChatBarButton: ChatBarButtonFactory = ({ isMainChat }) => {
+    if (!isMainChat) return null;
+
+    const handleClick = () => {
+        // Open the expression picker in GIF mode
+        ExpressionPickerStore.toggleExpressionPicker("gif");
+
+        // Once opened, find and click the MAM tab
+        setTimeout(() => {
+            const tabLists = document.querySelectorAll<HTMLElement>("[role=\"tablist\"]");
+            for (const tabList of tabLists) {
+                const mamTab = tabList.querySelector<HTMLElement>("[data-vc-mam-tab]");
+                if (mamTab) {
+                    mamTab.click();
+                    break;
+                }
+            }
+        }, 0);
+    };
+
+    return (
+        <ChatBarButton
+            tooltip="MAM GIFs"
+            onClick={handleClick}
+        >
+            <MamIcon />
+        </ChatBarButton>
+    );
+};
+
 function findPickerEntries() {
     const entries: Array<{ tabList: HTMLElement; sampleTab: HTMLElement; samplePanel: HTMLElement; }> = [];
     const seen = new Set<HTMLElement>();
@@ -883,6 +929,10 @@ export default definePlugin({
         { name: "Ice", id: 788437114583777280n }
     ],
     settings,
+    chatBarButton: {
+        icon: MamIcon,
+        render: MamChatBarButton
+    },
     start() {
         void ensureMamCsp();
         observer = new MutationObserver(scanForPicker);
