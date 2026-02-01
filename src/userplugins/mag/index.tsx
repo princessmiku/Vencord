@@ -657,20 +657,13 @@ const MamChatBarButton: ChatBarButtonFactory = ({ isMainChat }) => {
     if (!isMainChat) return null;
 
     const handleClick = () => {
-        // Open the expression picker in GIF mode
-
-        ComponentDispatch.dispatch("OPEN_EXPRESSION_PICKER", { activeView: "gif" });
-
-
-        // Once opened, find and click the MAM tab
+        ComponentDispatch.dispatch("TOGGLE_GIF_PICKER");
         setTimeout(() => {
-            const tabLists = document.querySelectorAll<HTMLElement>("[role=\"tablist\"]");
-            for (const tabList of tabLists) {
-                const mamTab = tabList.querySelector<HTMLElement>("[data-vc-mam-tab]");
-                if (mamTab) {
-                    mamTab.click();
-                    break;
-                }
+            const entries = findPickerEntries();
+            if (entries.length > 0) {
+                const { tabList, sampleTab, samplePanel } = entries[0];
+                const activeClassNames = getActiveClassNames(tabList, sampleTab);
+                setMamActive(tabList, samplePanel, true, activeClassNames);
             }
         }, 0);
     };
