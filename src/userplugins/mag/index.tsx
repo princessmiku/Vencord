@@ -10,13 +10,15 @@ import { ReplyIcon } from "@components/Icons";
 import { sendMessage } from "@utils/discord";
 import { relaunch } from "@utils/native";
 import definePlugin, { OptionType } from "@utils/types";
-import { findCssClassesLazy } from "@webpack";
+import { findCssClassesLazy, findStoreLazy } from "@webpack";
 import {
     Alerts,
     Button,
     ComponentDispatch,
     createRoot,
     ExpressionPickerStore,
+    FluxDispatcher,
+    MessageActions,
     React,
     SelectedChannelStore,
     Toasts,
@@ -41,6 +43,7 @@ const MAM_TAB_ID_ATTR = "data-vc-mam-tab-id";
 const MAM_OWNER_ATTR = "data-vc-mam-owner";
 const API_BASE_URL = "https://www.midevelopment.de/";
 const scrollerClasses = findCssClassesLazy("scrollerBase", "thin", "fade");
+const PendingReplyStore = findStoreLazy("PendingReplyStore");
 
 type MamRoot = { render: (node: React.ReactNode) => void; unmount: () => void; };
 type MagGif = {
@@ -360,7 +363,13 @@ function MamView() {
             });
             return;
         }
-        sendMessage(channelId, { content: gif.public_url });
+
+        const reply = PendingReplyStore.getPendingReply(channelId);
+        const replyOptions = reply ? MessageActions.getSendMessageOptionsForReply(reply) : undefined;
+        void sendMessage(channelId, { content: gif.public_url }, true, replyOptions ?? {})
+            .then(() => {
+                if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
+            });
         ExpressionPickerStore.closeExpressionPicker();
     }, []);
 
