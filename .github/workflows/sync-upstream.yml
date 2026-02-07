@@ -1,66 +1,71 @@
 name: Sync upstream
 
 on:
-  schedule:
-    - cron: "0 3 * * *" # täglich 03:00 UTC
-  workflow_dispatch: {}
+    schedule:
+        -   cron: "0 3 * * *" # täglich 03:00 UTC
+    workflow_dispatch: { }
 
 permissions:
-  contents: write
-  pull-requests: write
+    contents: write
+    pull-requests: write
 
 jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    sync:
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 0
 
-      - name: Configure merge driver for .gitattributes (merge=ours)
-        run: |
-          git config merge.ours.driver true
+            -   name: Configure merge driver for .gitattributes
+                run: |
+                    git config merge.ours.driver true
 
-      - name: Add upstream and fetch
-        run: |
-          git remote add upstream https://github.com/Vendicated/Vencord.git || true
-          git fetch upstream --prune
+            -   name: Configure git identity
+                run: |
+                    git config user.name "github-actions[bot]"
+                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Create sync branch
-        run: |
-          git checkout -B bot/sync-upstream
+            -   name: Add upstream and fetch
+                run: |
+                    git remote add upstream https://github.com/Vendicated/Vencord.git || true
+                    git fetch upstream --prune
 
-      - name: Merge upstream into sync branch
-        run: |
-          git merge --no-edit upstream/main
+            -   name: Create sync branch
+                run: |
+                    git checkout -B bot/sync-upstream
 
-      - name: Show diffs for sensitive files (for PR description)
-        id: diffcheck
-        run: |
-          set +e
-          echo "UTILS_CHANGED=false" >> $GITHUB_OUTPUT
-          echo "CSP_CHANGED=false" >> $GITHUB_OUTPUT
+            -   name: Merge upstream into sync branch
+                run: |
+                    git merge --no-edit upstream/main
 
-          git diff --name-only upstream/main...HEAD | grep -q '^scripts/utils\.mjs$'
-          if [ $? -eq 0 ]; then echo "UTILS_CHANGED=true" >> $GITHUB_OUTPUT; fi
+            -   name: Show diffs for sensitive files (for PR description)
+                id: diffcheck
+                run: |
+                    set +e
+                    echo "UTILS_CHANGED=false" >> $GITHUB_OUTPUT
+                    echo "CSP_CHANGED=false" >> $GITHUB_OUTPUT
 
-          git diff --name-only upstream/main...HEAD | grep -q '^src/main/csp/index\.ts$'
-          if [ $? -eq 0 ]; then echo "CSP_CHANGED=true" >> $GITHUB_OUTPUT; fi
-          exit 0
+                    git diff --name-only upstream/main...HEAD | grep -q '^scripts/utils\.mjs$'
+                    if [ $? -eq 0 ]; then echo "UTILS_CHANGED=true" >> $GITHUB_OUTPUT; fi
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          branch: bot/sync-upstream
-          title: "chore: sync with upstream"
-          body: |
-            Automated sync from upstream (Vendicated/Vencord).
+                    git diff --name-only upstream/main...HEAD | grep -q '^src/main/csp/index\.ts$'
+                    if [ $? -eq 0 ]; then echo "CSP_CHANGED=true" >> $GITHUB_OUTPUT; fi
+                    exit 0
 
-            Please review these files carefully if changed:
-            - scripts/utils.mjs (changed: ${{ steps.diffcheck.outputs.UTILS_CHANGED }})
-            - src/main/csp/index.ts (changed: ${{ steps.diffcheck.outputs.CSP_CHANGED }})
+            -   name: Create Pull Request
+                uses: peter-evans/create-pull-request@v6
+                with:
+                    branch: bot/sync-upstream
+                    title: "chore: sync with upstream"
+                    body: |
+                        Automated sync from upstream (Vendicated/Vencord).
 
-            mag folder is protected via .gitattributes:
-            - src/userplugins/mag/**
-          labels: upstream-sync
+                        Please review these files carefully if changed:
+                        - scripts/utils.mjs (changed: ${{ steps.diffcheck.outputs.UTILS_CHANGED }})
+                        - src/main/csp/index.ts (changed: ${{ steps.diffcheck.outputs.CSP_CHANGED }})
+
+                        mag folder is protected via .gitattributes:
+                        - src/userplugins/mag/**
+                    labels: upstream-sync
