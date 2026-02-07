@@ -2,7 +2,7 @@ name: Sync upstream
 
 on:
     schedule:
-        -   cron: "0 3 * * *" # täglich 03:00 UTC
+        -   cron: "0 3 * * *"
     workflow_dispatch: { }
 
 permissions:
@@ -11,50 +11,28 @@ permissions:
 
 jobs:
     sync:
-        if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main'
         steps:
-            -   name: Checkout
+            -   name: Checkout main
                 uses: actions/checkout@v4
                 with:
                     fetch-depth: 0
                     ref: main
 
-            -   name: Configure merge driver for .gitattributes
+            -   name: Configure merge driver for .gitattributes (merge=ours)
                 run: |
                     git config merge.ours.driver true
-
-            -   name: Configure git identity
-                run: |
-                    git config user.name "github-actions[bot]"
-                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
             -   name: Add upstream and fetch
                 run: |
                     git remote add upstream https://github.com/Vendicated/Vencord.git || true
                     git fetch upstream --prune
 
-            -   name: Create sync branch
+            # WICHTIG: Merge OHNE Commit, damit create-pull-request committen kann
+            -   name: Merge upstream into main (no commit)
                 run: |
-                    git checkout -B bot/sync-upstream
-
-            -   name: Merge upstream into sync branch
-                run: |
-                    git merge --no-edit upstream/main
-
-            -   name: Show diffs for sensitive files (for PR description)
-                id: diffcheck
-                run: |
-                    set +e
-                    echo "UTILS_CHANGED=false" >> $GITHUB_OUTPUT
-                    echo "CSP_CHANGED=false" >> $GITHUB_OUTPUT
-
-                    git diff --name-only upstream/main...HEAD | grep -q '^scripts/utils\.mjs$'
-                    if [ $? -eq 0 ]; then echo "UTILS_CHANGED=true" >> $GITHUB_OUTPUT; fi
-
-                    git diff --name-only upstream/main...HEAD | grep -q '^src/main/csp/index\.ts$'
-                    if [ $? -eq 0 ]; then echo "CSP_CHANGED=true" >> $GITHUB_OUTPUT; fi
-                    exit 0
+                    git merge --no-commit --no-ff upstream/main
 
             -   name: Create Pull Request
                 uses: peter-evans/create-pull-request@v6
@@ -62,12 +40,13 @@ jobs:
                     base: main
                     branch: bot/sync-upstream
                     title: "chore: sync with upstream"
+                    commit-message: "chore: sync with upstream"
                     body: |
                         Automated sync from upstream (Vendicated/Vencord).
 
                         Please review these files carefully if changed:
-                        - scripts/utils.mjs (changed: ${{ steps.diffcheck.outputs.UTILS_CHANGED }})
-                        - src/main/csp/index.ts (changed: ${{ steps.diffcheck.outputs.CSP_CHANGED }})
+                        - scripts/utils.mjs
+                        - src/main/csp/index.ts
 
                         mag folder is protected via .gitattributes:
                         - src/userplugins/mag/**
