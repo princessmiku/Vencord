@@ -1,0 +1,66 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # täglich 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure merge driver for .gitattributes (merge=ours)
+        run: |
+          git config merge.ours.driver true
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/Vendicated/Vencord.git || true
+          git fetch upstream --prune
+
+      - name: Create sync branch
+        run: |
+          git checkout -B bot/sync-upstream
+
+      - name: Merge upstream into sync branch
+        run: |
+          git merge --no-edit upstream/main
+
+      - name: Show diffs for sensitive files (for PR description)
+        id: diffcheck
+        run: |
+          set +e
+          echo "UTILS_CHANGED=false" >> $GITHUB_OUTPUT
+          echo "CSP_CHANGED=false" >> $GITHUB_OUTPUT
+
+          git diff --name-only upstream/main...HEAD | grep -q '^scripts/utils\.mjs$'
+          if [ $? -eq 0 ]; then echo "UTILS_CHANGED=true" >> $GITHUB_OUTPUT; fi
+
+          git diff --name-only upstream/main...HEAD | grep -q '^src/main/csp/index\.ts$'
+          if [ $? -eq 0 ]; then echo "CSP_CHANGED=true" >> $GITHUB_OUTPUT; fi
+          exit 0
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: bot/sync-upstream
+          title: "chore: sync with upstream"
+          body: |
+            Automated sync from upstream (Vendicated/Vencord).
+
+            Please review these files carefully if changed:
+            - scripts/utils.mjs (changed: ${{ steps.diffcheck.outputs.UTILS_CHANGED }})
+            - src/main/csp/index.ts (changed: ${{ steps.diffcheck.outputs.CSP_CHANGED }})
+
+            mag folder is protected via .gitattributes:
+            - src/userplugins/mag/**
+          labels: upstream-sync
