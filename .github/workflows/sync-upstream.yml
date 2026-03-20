@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      workflows: write # allow syncing workflow files as well
-
     steps:
       - name: Sync with upstream
         env:
