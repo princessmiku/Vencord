@@ -52,7 +52,6 @@ jobs:
       - name: Create release archives (zip + tar.gz)
         run: |
           set -euo pipefail
-          # Create archives that contain a top-level "dist/" folder
           zip -r dist.zip dist
           tar -czf dist.tar.gz dist
 
@@ -63,34 +62,24 @@ jobs:
           set -euo pipefail
           SHORT_SHA="$(git rev-parse --short HEAD)"
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=devbuild-$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "title=DevBuild $SHORT_SHA" >> "$GITHUB_OUTPUT"
 
-      # Create the release if it doesn't exist yet, otherwise update it
-      - name: Ensure devbuild release exists
+      - name: Create a new release for this commit (unique tag)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh release view devbuild >/dev/null 2>&1 || \
-            gh release create devbuild \
-              --title "DevBuild" \
-              --notes "Automated dev builds for this fork."
-
-      - name: Upload DevBuild archives (overwrite)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Upload only the archives; --clobber overwrites assets with the same name
-          gh release upload devbuild --clobber dist.zip dist.tar.gz
-
-      - name: Update release title/notes to point at latest commit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.rel.outputs.tag }}
           TITLE: ${{ steps.rel.outputs.title }}
-          SHORT_SHA: ${{ steps.rel.outputs.short_sha }}
         run: |
           set -euo pipefail
-          gh release edit devbuild \
+          gh release create "$TAG" \
             --title "$TITLE" \
-            --notes "Latest build from commit $GITHUB_SHA (short: $SHORT_SHA)."
+            --notes "Build from commit $GITHUB_SHA."
+
+      - name: Upload DevBuild archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" dist.zip dist.tar.gz
