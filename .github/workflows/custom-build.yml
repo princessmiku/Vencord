@@ -49,6 +49,13 @@ jobs:
         run: |
           rm -rf dist/*-unpacked dist/vendor Vencord.user.css vencordDesktopRenderer.css vencordDesktopRenderer.css.map
 
+      - name: Create release archives (zip + tar.gz)
+        run: |
+          set -euo pipefail
+          # Create archives that contain a top-level "dist/" folder
+          zip -r dist.zip dist
+          tar -czf dist.tar.gz dist
+
       - name: Compute release title/tag
         id: rel
         shell: bash
@@ -69,13 +76,13 @@ jobs:
               --title "DevBuild" \
               --notes "Automated dev builds for this fork."
 
-      - name: Upload DevBuild assets (overwrite)
+      - name: Upload DevBuild archives (overwrite)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Upload all dist files; --clobber overwrites assets with the same name
-          gh release upload devbuild --clobber dist/*
+          # Upload only the archives; --clobber overwrites assets with the same name
+          gh release upload devbuild --clobber dist.zip dist.tar.gz
 
       - name: Update release title/notes to point at latest commit
         env:
