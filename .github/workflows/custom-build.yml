@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - .github/workflows/build.yml
+      - .github/workflows/custom-build.yml
       - src/**
       - browser/**
       - scripts/build/**
