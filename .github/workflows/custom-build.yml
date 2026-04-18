@@ -1,0 +1,88 @@
+name: Build DevBuild (Fork)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/build.yml
+      - src/**
+      - browser/**
+      - scripts/build/**
+      - package.json
+      - pnpm-lock.yaml
+
+env:
+  FORCE_COLOR: true
+
+permissions:
+  contents: write # required to create/edit releases + upload assets
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3 # Install pnpm using packageManager key in package.json
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web
+        run: pnpm buildWebStandalone
+
+      - name: Build
+        run: pnpm build --standalone
+
+      - name: Generate plugin list
+        run: pnpm generatePluginJson dist/plugins.json dist/plugin-readmes.json
+
+      - name: Clean up obsolete files
+        run: |
+          rm -rf dist/*-unpacked dist/vendor Vencord.user.css vencordDesktopRenderer.css vencordDesktopRenderer.css.map
+
+      - name: Compute release title/tag
+        id: rel
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "title=DevBuild $SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      # Create the release if it doesn't exist yet, otherwise update it
+      - name: Ensure devbuild release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view devbuild >/dev/null 2>&1 || \
+            gh release create devbuild \
+              --title "DevBuild" \
+              --notes "Automated dev builds for this fork."
+
+      - name: Upload DevBuild assets (overwrite)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Upload all dist files; --clobber overwrites assets with the same name
+          gh release upload devbuild --clobber dist/*
+
+      - name: Update release title/notes to point at latest commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: ${{ steps.rel.outputs.title }}
+          SHORT_SHA: ${{ steps.rel.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          gh release edit devbuild \
+            --title "$TITLE" \
+            --notes "Latest build from commit $GITHUB_SHA (short: $SHORT_SHA)."
