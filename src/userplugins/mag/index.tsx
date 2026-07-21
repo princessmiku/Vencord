@@ -102,7 +102,7 @@ function getNative() {
     return null;
 }
 
-async function fetchMagApi(url: string, options: { headers?: Record<string, string> } = {}) {
+async function fetchMagApi(url: string, options: RequestInit & { headers?: Record<string, string> } = {}) {
     const native = getNative();
 
     if (!native || typeof native.fetchMagApi !== "function") {
@@ -120,6 +120,40 @@ async function fetchMagApi(url: string, options: { headers?: Record<string, stri
     } catch (err) {
         console.error("[MAM] Native request failed:", err);
         throw err;
+    }
+}
+
+async function trackGifSend(gifId: number, query: string, apiKey: string) {
+    const headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey
+    };
+
+    const shareUrl = new URL(`/api/gifs/${gifId}/share`, API_BASE_URL);
+    const requests = [
+        fetchMagApi(shareUrl.toString(), {
+            method: "POST",
+            headers
+        })
+    ];
+
+    if (query) {
+        const analyticsUrl = new URL("/api/gifs/query/analytics", API_BASE_URL);
+        requests.push(fetchMagApi(analyticsUrl.toString(), {
+            method: "POST",
+            headers,
+            body: JSON.stringify({query, gif_id: gifId})
+        }));
+    }
+
+    const results = await Promise.allSettled(requests);
+
+    for (const result of results) {
+        if (result.status === "rejected") {
+            console.error("[MAM] GIF tracking request failed:", result.reason);
+        } else if (!result.value.ok) {
+            console.error("[MAM] GIF tracking request failed:", result.value.status);
+        }
     }
 }
 
@@ -484,9 +518,10 @@ function MamView() {
         void sendMessage(channelId, {content: gif.public_url}, true, replyOptions ?? {})
             .then(() => {
                 if (reply) FluxDispatcher.dispatch({type: "DELETE_PENDING_REPLY", channelId});
+                void trackGifSend(gif.id, debouncedQuery, normalizedApiKey);
             });
         ExpressionPickerStore.closeExpressionPicker();
-    }, []);
+    }, [debouncedQuery, normalizedApiKey]);
 
     const showCategories = viewMode === "categories";
 
