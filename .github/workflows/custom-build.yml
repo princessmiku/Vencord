@@ -82,4 +82,6 @@ jobs:
           TAG: ${{ steps.rel.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" dist.zip dist.tar.gz
+
+          # Upload packed dist files as well as each single file (because the stupid updater needs it that way >:c )
+          gh release upload "$TAG" dist.zip dist.tar.gz dist/*
