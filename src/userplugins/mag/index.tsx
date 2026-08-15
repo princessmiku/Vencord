@@ -36,7 +36,7 @@ const MAM_BOUND_ATTR = "data-vc-mam-bound";
 const MAM_PANEL_ID_ATTR = "data-vc-mam-panel-id";
 const MAM_TAB_ID_ATTR = "data-vc-mam-tab-id";
 const MAM_OWNER_ATTR = "data-vc-mam-owner";
-const API_BASE_URL = "https://www.midevelopment.de/";
+const API_BASE_URL = "https://api.midevelopment.de/";
 const scrollerClasses = findCssClassesLazy("scrollerBase", "thin", "fade");
 const PendingReplyStore = findStoreLazy("PendingReplyStore");
 
