@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import {ChatBarButton, ChatBarButtonFactory} from "@api/ChatButtons";
-import {definePluginSettings} from "@api/Settings";
-import {ReplyIcon} from "@components/Icons";
-import {sendMessage} from "@utils/discord";
-import {relaunch} from "@utils/native";
-import definePlugin, {OptionType} from "@utils/types";
-import {findCssClassesLazy, findStoreLazy} from "@webpack";
+import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
+import { definePluginSettings } from "@api/Settings";
+import { ReplyIcon } from "@components/Icons";
+import { sendMessage } from "@utils/discord";
+import { relaunch } from "@utils/native";
+import definePlugin, { OptionType } from "@utils/types";
+import { findCssClassesLazy, findStoreLazy } from "@webpack";
 import {
     Alerts,
     Button,
@@ -26,7 +26,7 @@ import {
     useEffect,
     useLayoutEffect,
     useRef,
-    useState
+    useState,
 } from "@webpack/common";
 
 const MAM_LABEL = "MAM";
@@ -40,7 +40,7 @@ const API_BASE_URL = "https://www.midevelopment.de/";
 const scrollerClasses = findCssClassesLazy("scrollerBase", "thin", "fade");
 const PendingReplyStore = findStoreLazy("PendingReplyStore");
 
-type MamRoot = { render: (node: React.ReactNode) => void; unmount: () => void; };
+type MamRoot = { render: (node: React.ReactNode) => void; unmount: () => void };
 type MagGif = {
     id: number;
     public_url: string;
@@ -126,24 +126,26 @@ async function fetchMagApi(url: string, options: RequestInit & { headers?: Recor
 async function trackGifSend(gifId: number, query: string, apiKey: string) {
     const headers = {
         "Content-Type": "application/json",
-        "X-API-Key": apiKey
+        "X-API-Key": apiKey,
     };
 
     const shareUrl = new URL(`/api/gifs/${gifId}/share`, API_BASE_URL);
     const requests = [
         fetchMagApi(shareUrl.toString(), {
             method: "POST",
-            headers
-        })
+            headers,
+        }),
     ];
 
     if (query) {
         const analyticsUrl = new URL("/api/gifs/query/analytics", API_BASE_URL);
-        requests.push(fetchMagApi(analyticsUrl.toString(), {
-            method: "POST",
-            headers,
-            body: JSON.stringify({query, gif_id: gifId})
-        }));
+        requests.push(
+            fetchMagApi(analyticsUrl.toString(), {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ query, gif_id: gifId }),
+            }),
+        );
     }
 
     const results = await Promise.allSettled(requests);
@@ -156,7 +158,6 @@ async function trackGifSend(gifId: number, query: string, apiKey: string) {
         }
     }
 }
-
 
 const cleanupFns = new Set<() => void>();
 const mamRoots = new WeakMap<HTMLElement, MamRoot>();
@@ -187,7 +188,7 @@ interface MasonryGridProps {
     gap?: number;
 }
 
-function MasonryGrid({items, onSend, columnWidth = 140, gap = 8}: MasonryGridProps) {
+function MasonryGrid({ items, onSend, columnWidth = 140, gap = 8 }: MasonryGridProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnRefs = useRef<HTMLDivElement[]>([]);
     const columnHeightsRef = useRef<number[]>([]);
@@ -204,7 +205,7 @@ function MasonryGrid({items, onSend, columnWidth = 140, gap = 8}: MasonryGridPro
         const container = containerRef.current;
         if (!container) return;
         const ro = new ResizeObserver(entries => {
-            const width = entries[0].contentRect.width;
+            const { width } = entries[0].contentRect;
             const count = Math.max(1, Math.floor((width + gap) / (columnWidth + gap)));
             setColumnCount(count);
         });
@@ -257,18 +258,18 @@ function MasonryGrid({items, onSend, columnWidth = 140, gap = 8}: MasonryGridPro
                 const cols = columnRefs.current;
                 if (!cols.length) return;
 
-                const shortestIdx = columnHeightsRef.current.indexOf(
-                    Math.min(...columnHeightsRef.current)
-                );
+                const shortestIdx = columnHeightsRef.current.indexOf(Math.min(...columnHeightsRef.current));
                 const col = cols[shortestIdx];
 
-                const estimatedH = loadedImg.naturalHeight && loadedImg.naturalWidth
-                    ? (loadedImg.naturalHeight / loadedImg.naturalWidth) * columnWidth
-                    : 120;
+                const estimatedH =
+                    loadedImg.naturalHeight && loadedImg.naturalWidth
+                        ? (loadedImg.naturalHeight / loadedImg.naturalWidth) * columnWidth
+                        : 120;
                 columnHeightsRef.current[shortestIdx] += estimatedH + gap;
 
                 const btn = document.createElement("button");
-                btn.style.cssText = "border:none;padding:0;background:transparent;cursor:pointer;display:block;width:100%;";
+                btn.style.cssText =
+                    "border:none;padding:0;background:transparent;cursor:pointer;display:block;width:100%;";
                 btn.setAttribute("aria-label", "Send GIF");
                 btn.setAttribute("title", "Send GIF");
                 btn.addEventListener("click", () => onSend(gif));
@@ -277,9 +278,13 @@ function MasonryGrid({items, onSend, columnWidth = 140, gap = 8}: MasonryGridPro
                 img.src = loadedImg.src;
                 img.loading = "eager";
                 img.style.cssText = "display:block;width:100%;height:auto;border-radius:6px;";
-                img.addEventListener("load", () => {
-                    columnHeightsRef.current[shortestIdx] = col.scrollHeight;
-                }, {once: true});
+                img.addEventListener(
+                    "load",
+                    () => {
+                        columnHeightsRef.current[shortestIdx] = col.scrollHeight;
+                    },
+                    { once: true },
+                );
 
                 btn.appendChild(img);
                 col.appendChild(btn);
@@ -287,12 +292,7 @@ function MasonryGrid({items, onSend, columnWidth = 140, gap = 8}: MasonryGridPro
         }
     });
 
-    return (
-        <div
-            ref={containerRef}
-            style={{display: "flex", gap, width: "100%", alignItems: "flex-start"}}
-        />
-    );
+    return <div ref={containerRef} style={{ display: "flex", gap, width: "100%", alignItems: "flex-start" }} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ function MasonryGrid({items, onSend, columnWidth = 140, gap = 8}: MasonryGridPro
 // ---------------------------------------------------------------------------
 
 function MamView() {
-    const {apiKey} = settings.use(["apiKey"]);
+    const { apiKey } = settings.use(["apiKey"]);
     const normalizedApiKey = apiKey.trim();
 
     const [query, setQuery] = useState("");
@@ -354,17 +354,22 @@ function MamView() {
         setListsLoading(true);
         setListsError(null);
         const url = new URL("/api/gif-lists", API_BASE_URL);
-        fetchMagApi(url.toString(), {headers: {"X-API-Key": normalizedApiKey}}).then(res => {
-            if (!res.ok) throw new Error(res.status === 401 ? "Invalid API key." : `Request failed (${res.status}).`);
-            return res.data as GifListEntry[];
-        }).then(data => {
-            setLists(Array.isArray(data) ? data : []);
-        }).catch(err => {
-            setListsError(err instanceof Error ? err.message : "Failed to fetch lists.");
-            setLists([]);
-        }).finally(() => {
-            setListsLoading(false);
-        });
+        fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } })
+            .then(res => {
+                if (!res.ok)
+                    throw new Error(res.status === 401 ? "Invalid API key." : `Request failed (${res.status}).`);
+                return res.data as GifListEntry[];
+            })
+            .then(data => {
+                setLists(Array.isArray(data) ? data : []);
+            })
+            .catch(err => {
+                setListsError(err instanceof Error ? err.message : "Failed to fetch lists.");
+                setLists([]);
+            })
+            .finally(() => {
+                setListsLoading(false);
+            });
     }, [normalizedApiKey]);
 
     // Fetch preview thumbnails for each list.
@@ -377,11 +382,12 @@ function MamView() {
             const previews: Record<string, string | null> = {};
             const fetchFirstGif = async (url: URL) => {
                 try {
-                    const res = await fetchMagApi(url.toString(), {headers: {"X-API-Key": normalizedApiKey}});
+                    const res = await fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } });
                     if (res.ok && Array.isArray(res.data.items) && res.data.items.length > 0) {
                         return (res.data.items[0] as MagGif).public_url;
                     }
-                } catch (_) { /* ignore */
+                } catch (_) {
+                    /* ignore */
                 }
                 return null;
             };
@@ -450,29 +456,34 @@ function MamView() {
             url.searchParams.set("visibility", "published");
         }
 
-        fetchMagApi(url.toString(), {headers: {"X-API-Key": normalizedApiKey}}).then(res => {
-            if (!res.ok) throw new Error(res.status === 401 ? "Invalid API key." : `Request failed (${res.status}).`);
-            return res.data as MagResponse;
-        }).then(data => {
-            if (controller.signal.aborted) return;
-            const nextItems = Array.isArray(data.items) ? data.items : [];
-            // For page 1 the items state was already cleared above, so we
-            // always set (never concat) here.  For page > 1 we append.
-            setItems(prev => isPaginating ? [...prev, ...nextItems] : nextItems);
-            const hasMoreFromFlag = typeof data.pagination?.has_more === "boolean"
-                ? data.pagination.has_more : null;
-            setHasMore(hasMoreFromFlag ?? data.pagination?.next_page != null);
-        }).catch(err => {
-            if (controller.signal.aborted) return;
-            setError(err instanceof Error ? err.message : "Request failed.");
-            if (!isPaginating) setItems([]);
-            setHasMore(false);
-        }).finally(() => {
-            if (controller.signal.aborted) return;
-            setInitialLoading(false);
-            setLoadingMore(false);
-            loadingMoreRef.current = false;
-        });
+        fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } })
+            .then(res => {
+                if (!res.ok)
+                    throw new Error(res.status === 401 ? "Invalid API key." : `Request failed (${res.status}).`);
+                return res.data as MagResponse;
+            })
+            .then(data => {
+                if (controller.signal.aborted) return;
+                const nextItems = Array.isArray(data.items) ? data.items : [];
+                // For page 1 the items state was already cleared above, so we
+                // always set (never concat) here.  For page > 1 we append.
+                setItems(prev => (isPaginating ? [...prev, ...nextItems] : nextItems));
+                const hasMoreFromFlag =
+                    typeof data.pagination?.has_more === "boolean" ? data.pagination.has_more : null;
+                setHasMore(hasMoreFromFlag ?? data.pagination?.next_page != null);
+            })
+            .catch(err => {
+                if (controller.signal.aborted) return;
+                setError(err instanceof Error ? err.message : "Request failed.");
+                if (!isPaginating) setItems([]);
+                setHasMore(false);
+            })
+            .finally(() => {
+                if (controller.signal.aborted) return;
+                setInitialLoading(false);
+                setLoadingMore(false);
+                loadingMoreRef.current = false;
+            });
 
         return () => controller.abort();
     }, [normalizedApiKey, debouncedQuery, selectedListId, page, viewMode]);
@@ -489,8 +500,7 @@ function MamView() {
         const check = () => {
             if (!hasMore || loadingMoreRef.current || initialLoading) return;
 
-            const distanceFromBottom =
-                scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+            const distanceFromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
 
             if (distanceFromBottom < 600) {
                 loadingMoreRef.current = true;
@@ -500,45 +510,47 @@ function MamView() {
 
         check();
 
-        scroller.addEventListener("scroll", check, {passive: true});
+        scroller.addEventListener("scroll", check, { passive: true });
 
         return () => {
             scroller.removeEventListener("scroll", check);
         };
     }, [hasMore, initialLoading]);
 
-    const onSend = useCallback((gif: MagGif) => {
-        const channelId = SelectedChannelStore.getChannelId();
-        if (!channelId) {
-            Toasts.show({message: "No channel selected.", id: Toasts.genId(), type: Toasts.Type.FAILURE});
-            return;
-        }
-        const reply = PendingReplyStore.getPendingReply(channelId);
-        const replyOptions = reply ? MessageActions.getSendMessageOptionsForReply(reply) : undefined;
-        void sendMessage(channelId, {content: gif.public_url}, true, replyOptions ?? {})
-            .then(() => {
-                if (reply) FluxDispatcher.dispatch({type: "DELETE_PENDING_REPLY", channelId});
+    const onSend = useCallback(
+        (gif: MagGif) => {
+            const channelId = SelectedChannelStore.getChannelId();
+            if (!channelId) {
+                Toasts.show({ message: "No channel selected.", id: Toasts.genId(), type: Toasts.Type.FAILURE });
+                return;
+            }
+            const reply = PendingReplyStore.getPendingReply(channelId);
+            const replyOptions = reply ? MessageActions.getSendMessageOptionsForReply(reply) : undefined;
+            void sendMessage(channelId, { content: gif.public_url }, true, replyOptions ?? {}).then(() => {
+                if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
                 void trackGifSend(gif.id, debouncedQuery, normalizedApiKey);
             });
-        ExpressionPickerStore.closeExpressionPicker();
-    }, [debouncedQuery, normalizedApiKey]);
+            ExpressionPickerStore.closeExpressionPicker();
+        },
+        [debouncedQuery, normalizedApiKey],
+    );
 
     const showCategories = viewMode === "categories";
 
     function renderCategoryGrid() {
-        if (listsLoading) return (
-            <div style={{gridColumn: "1 / -1", padding: "8px", opacity: 0.7}}>Loading lists…</div>
-        );
-        if (listsError) return (
-            <div style={{gridColumn: "1 / -1", padding: "8px", color: "var(--status-danger)"}}>{listsError}</div>
-        );
-        const entries: Array<{ id: number | null; name: string; key: string; }> = [
-            {id: null, name: "Alle GIFs", key: "all"},
-            ...lists.map(l => ({id: l.id, name: l.name, key: l.id.toString()}))
+        if (listsLoading)
+            return <div style={{ gridColumn: "1 / -1", padding: "8px", opacity: 0.7 }}>Loading lists…</div>;
+        if (listsError)
+            return (
+                <div style={{ gridColumn: "1 / -1", padding: "8px", color: "var(--status-danger)" }}>{listsError}</div>
+            );
+        const entries: Array<{ id: number | null; name: string; key: string }> = [
+            { id: null, name: "Alle GIFs", key: "all" },
+            ...lists.map(l => ({ id: l.id, name: l.name, key: l.id.toString() })),
         ];
         return entries.map(entry => {
-            const active = (viewMode === "all" && entry.id === null)
-                || (viewMode === "list" && selectedListId === entry.id);
+            const active =
+                (viewMode === "all" && entry.id === null) || (viewMode === "list" && selectedListId === entry.id);
             const previewUrl = listPreviews[entry.key] ?? null;
             return (
                 <button
@@ -561,27 +573,43 @@ function MamView() {
                         borderRadius: 6,
                         cursor: "pointer",
                         overflow: "hidden",
-                        height: 100
+                        height: 100,
                     }}
                     aria-label={entry.name}
                     title={entry.name}
                 >
-                    {previewUrl
-                        ? <img src={previewUrl} loading="lazy"
-                               style={{width: "100%", height: "100%", objectFit: "cover"}}/>
-                        : <div style={{width: "100%", height: "100%", backgroundColor: "var(--background-tertiary)"}}/>
-                    }
-                    <div style={{
-                        position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: active ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.35)",
-                        transition: "background-color 0.2s"
-                    }}/>
-                    <div style={{
-                        position: "absolute", top: "50%", left: "50%",
-                        transform: "translate(-50%,-50%)",
-                        color: "white", fontWeight: "bold",
-                        textShadow: "0 0 4px rgba(0,0,0,0.8)", pointerEvents: "none"
-                    }}>
+                    {previewUrl ? (
+                        <img
+                            src={previewUrl}
+                            loading="lazy"
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                    ) : (
+                        <div style={{ width: "100%", height: "100%", backgroundColor: "var(--background-tertiary)" }} />
+                    )}
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: active ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.35)",
+                            transition: "background-color 0.2s",
+                        }}
+                    />
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: "50%",
+                            transform: "translate(-50%,-50%)",
+                            color: "white",
+                            fontWeight: "bold",
+                            textShadow: "0 0 4px rgba(0,0,0,0.8)",
+                            pointerEvents: "none",
+                        }}
+                    >
                         {entry.name}
                     </div>
                 </button>
@@ -590,9 +618,9 @@ function MamView() {
     }
 
     return (
-        <div style={{display: "flex", flexDirection: "column", height: "100%", overflow: "hidden"}}>
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
             {/* Search bar */}
-            <div style={{padding: "8px 12px", display: "flex", gap: 8, alignItems: "center"}}>
+            <div style={{ padding: "8px 12px", display: "flex", gap: 8, alignItems: "center" }}>
                 {viewMode !== "categories" ? (
                     <Button
                         size={Button.Sizes.SMALL}
@@ -603,22 +631,37 @@ function MamView() {
                             setViewMode("categories");
                         }}
                     >
-                        <ReplyIcon width={18} height={18}/>
+                        <ReplyIcon width={18} height={18} />
                     </Button>
                 ) : null}
                 {viewMode !== "list" ? (
-                    <div style={{
-                        flex: 1, display: "flex", alignItems: "center", gap: 8,
-                        height: 32, padding: "0 10px", borderRadius: 16,
-                        backgroundColor: "var(--background-secondary)",
-                        border: "1px solid var(--background-tertiary)",
-                        boxShadow: searchFocused ? "0 0 0 2px var(--brand-500)" : "none",
-                        transition: "box-shadow 0.15s ease, border-color 0.15s ease"
-                    }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" role="img" aria-hidden="true"
-                             style={{color: "var(--text-muted)", flex: "0 0 auto"}}>
-                            <path fill="currentColor"
-                                  d="M10.5 3a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm8.85 12.44 3.2 3.2a1 1 0 0 1-1.42 1.42l-3.2-3.2a1 1 0 0 1 1.42-1.42Z"/>
+                    <div
+                        style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            height: 32,
+                            padding: "0 10px",
+                            borderRadius: 16,
+                            backgroundColor: "var(--background-secondary)",
+                            border: "1px solid var(--background-tertiary)",
+                            boxShadow: searchFocused ? "0 0 0 2px var(--brand-500)" : "none",
+                            transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+                        }}
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            role="img"
+                            aria-hidden="true"
+                            style={{ color: "var(--text-muted)", flex: "0 0 auto" }}
+                        >
+                            <path
+                                fill="currentColor"
+                                d="M10.5 3a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm8.85 12.44 3.2 3.2a1 1 0 0 1-1.42 1.42l-3.2-3.2a1 1 0 0 1 1.42-1.42Z"
+                            />
                         </svg>
                         <input
                             value={query}
@@ -631,51 +674,69 @@ function MamView() {
                             onBlur={() => setSearchFocused(false)}
                             aria-label="GIFs durchsuchen"
                             style={{
-                                flex: 1, height: "100%", background: "transparent", border: "none",
-                                color: "var(--input-text-default)", fontSize: 14, outline: "none"
+                                flex: 1,
+                                height: "100%",
+                                background: "transparent",
+                                border: "none",
+                                color: "var(--input-text-default)",
+                                fontSize: 14,
+                                outline: "none",
                             }}
                         />
                         {query ? (
-                            <button onClick={() => setQuery("")} aria-label="Suche löschen" style={{
-                                border: "none", background: "transparent",
-                                color: "var(--text-muted)", cursor: "pointer",
-                                padding: 0, fontSize: 16, lineHeight: 1
-                            }}>×</button>
+                            <button
+                                onClick={() => setQuery("")}
+                                aria-label="Suche löschen"
+                                style={{
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "var(--text-muted)",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                    fontSize: 16,
+                                    lineHeight: 1,
+                                }}
+                            >
+                                ×
+                            </button>
                         ) : null}
                     </div>
                 ) : null}
             </div>
 
-            {error ? (
-                <div style={{padding: "0 12px 8px", color: "var(--status-danger)"}}>{error}</div>
-            ) : null}
+            {error ? <div style={{ padding: "0 12px 8px", color: "var(--status-danger)" }}>{error}</div> : null}
 
             {/* Content area */}
-            <div ref={scrollerRef} style={{flex: 1, overflow: "auto"}}
-                 className={`${scrollerClasses.scrollerBase} ${scrollerClasses.thin} ${scrollerClasses.fade}`}>
-                <div style={{padding: "8px 16px 12px"}}>
+            <div
+                ref={scrollerRef}
+                style={{ flex: 1, overflow: "auto" }}
+                className={`${scrollerClasses.scrollerBase} ${scrollerClasses.thin} ${scrollerClasses.fade}`}
+            >
+                <div style={{ padding: "8px 16px 12px" }}>
                     {showCategories ? (
-                        <div style={{
-                            display: "grid",
-                            gap: 8,
-                            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
-                        }}>
+                        <div
+                            style={{
+                                display: "grid",
+                                gap: 8,
+                                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                            }}
+                        >
                             {renderCategoryGrid()}
                         </div>
                     ) : initialLoading ? (
-                        <div style={{opacity: 0.7, padding: "8px 0"}}>Loading…</div>
+                        <div style={{ opacity: 0.7, padding: "8px 0" }}>Loading…</div>
                     ) : (
                         <>
                             {!error && items.length === 0 ? (
-                                <div style={{opacity: 0.7}}>
+                                <div style={{ opacity: 0.7 }}>
                                     {selectedListId === null ? "No results." : "No items in this list."}
                                 </div>
                             ) : (
-                                <MasonryGrid items={items} onSend={onSend}/>
+                                <MasonryGrid items={items} onSend={onSend} />
                             )}
                             {/* Subtle loading indicator while fetching the next batch */}
                             {loadingMore ? (
-                                <div style={{textAlign: "center", padding: "8px 0 4px", opacity: 0.5, fontSize: 12}}>
+                                <div style={{ textAlign: "center", padding: "8px 0 4px", opacity: 0.5, fontSize: 12 }}>
                                     Loading…
                                 </div>
                             ) : null}
@@ -705,19 +766,18 @@ const settings = definePluginSettings({
 
 const MamIcon = () => (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-        <path
-            d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
     </svg>
 );
 
-const MamChatBarButton: ChatBarButtonFactory = ({isMainChat}) => {
+const MamChatBarButton: ChatBarButtonFactory = ({ isMainChat }) => {
     if (!isMainChat) return null;
     const handleClick = () => {
         ComponentDispatch.dispatch("TOGGLE_GIF_PICKER");
         setTimeout(() => {
             const entries = findPickerEntries();
             if (entries.length > 0) {
-                const {tabList, sampleTab, samplePanel} = entries[0];
+                const { tabList, sampleTab, samplePanel } = entries[0];
                 const activeClassNames = getActiveClassNames(tabList, sampleTab);
                 setMamActive(tabList, samplePanel, true, activeClassNames);
             }
@@ -725,7 +785,7 @@ const MamChatBarButton: ChatBarButtonFactory = ({isMainChat}) => {
     };
     return (
         <ChatBarButton tooltip="MAM GIFs" onClick={handleClick}>
-            <MamIcon/>
+            <MamIcon />
         </ChatBarButton>
     );
 };
@@ -735,17 +795,18 @@ const MamChatBarButton: ChatBarButtonFactory = ({isMainChat}) => {
 // ---------------------------------------------------------------------------
 
 function findPickerEntries() {
-    const entries: Array<{ tabList: HTMLElement; sampleTab: HTMLElement; samplePanel: HTMLElement; }> = [];
+    const entries: Array<{ tabList: HTMLElement; sampleTab: HTMLElement; samplePanel: HTMLElement }> = [];
     const seen = new Set<HTMLElement>();
     const panels = document.querySelectorAll<HTMLElement>("[id$=\"picker-tab-panel\"], [id*='picker-tab-panel']");
     for (const panel of panels) {
-        const tab = document.querySelector<HTMLElement>(`[role="tab"][aria-controls="${panel.id}"]`)
-            ?? document.querySelector<HTMLElement>(`[aria-controls="${panel.id}"]`);
+        const tab =
+            document.querySelector<HTMLElement>(`[role="tab"][aria-controls="${panel.id}"]`) ??
+            document.querySelector<HTMLElement>(`[aria-controls="${panel.id}"]`);
         if (!tab) continue;
         const tabList = tab.closest<HTMLElement>("[role='tablist']") ?? tab.parentElement;
         if (!tabList || seen.has(tabList)) continue;
         seen.add(tabList);
-        entries.push({tabList, sampleTab: tab, samplePanel: panel});
+        entries.push({ tabList, sampleTab: tab, samplePanel: panel });
     }
     return entries;
 }
@@ -760,13 +821,14 @@ function getMamIds(tabList: HTMLElement) {
         tabList.setAttribute(MAM_PANEL_ID_ATTR, panelId);
         tabList.setAttribute(MAM_TAB_ID_ATTR, tabId);
     }
-    return {panelId, tabId};
+    return { panelId, tabId };
 }
 
 function resolveSamplePanel(tabList: HTMLElement, fallback?: HTMLElement) {
-    const activeTab = tabList.querySelector<HTMLElement>("[role='tab'][aria-selected='true'], [role='tab'][aria-current='page']")
-        ?? tabList.querySelector<HTMLElement>("[role='tab']:not([data-vc-mam-tab])")
-        ?? tabList.querySelector<HTMLElement>("[role='tab']");
+    const activeTab =
+        tabList.querySelector<HTMLElement>("[role='tab'][aria-selected='true'], [role='tab'][aria-current='page']") ??
+        tabList.querySelector<HTMLElement>("[role='tab']:not([data-vc-mam-tab])") ??
+        tabList.querySelector<HTMLElement>("[role='tab']");
     const panelId = activeTab?.getAttribute("aria-controls");
     if (panelId) {
         const panel = document.getElementById(panelId);
@@ -784,9 +846,12 @@ function resolveSamplePanel(tabList: HTMLElement, fallback?: HTMLElement) {
 }
 
 function getActiveClassNames(tabList: HTMLElement, sampleTab: HTMLElement) {
-    const activeTab = tabList.querySelector<HTMLElement>("[role='tab'][aria-selected='true'], [role='tab'][aria-current='page']")
-        ?? sampleTab;
-    const inactiveTab = tabList.querySelector<HTMLElement>("[role='tab']:not([aria-selected='true']):not([aria-current='page'])");
+    const activeTab =
+        tabList.querySelector<HTMLElement>("[role='tab'][aria-selected='true'], [role='tab'][aria-current='page']") ??
+        sampleTab;
+    const inactiveTab = tabList.querySelector<HTMLElement>(
+        "[role='tab']:not([aria-selected='true']):not([aria-current='page'])",
+    );
     if (!activeTab) return [] as string[];
     if (!inactiveTab) return Array.from(activeTab.classList).filter(n => n.toLowerCase().includes("active"));
     const inactive = new Set(inactiveTab.classList);
@@ -828,7 +893,7 @@ function ensureMamPanel(samplePanel: HTMLElement, panelId: string): HTMLElement 
         mamPanel.innerHTML = "";
         panelContainer.appendChild(mamPanel);
         const root = createRoot(mamPanel) as MamRoot;
-        root.render(<MamView/>);
+        root.render(<MamView />);
         mamRoots.set(mamPanel, root);
     }
     return mamPanel;
@@ -845,7 +910,8 @@ function setMamActive(tabList: HTMLElement, samplePanel: HTMLElement, active: bo
         if (panel === mamPanel) return;
         if (active) {
             if (panel.style.display !== "none") panel.dataset.vcMamDisplay = panel.style.display;
-            if (panel.dataset.vcMamHidden === undefined) panel.dataset.vcMamHidden = panel.hasAttribute("hidden") ? "1" : "0";
+            if (panel.dataset.vcMamHidden === undefined)
+                panel.dataset.vcMamHidden = panel.hasAttribute("hidden") ? "1" : "0";
             panel.style.display = "none";
             panel.setAttribute("hidden", "");
         } else if (panel.dataset.vcMamDisplay !== undefined) {
@@ -876,7 +942,7 @@ function injectMamTab(tabList: HTMLElement, sampleTab: HTMLElement, samplePanel:
     if (tabList.hasAttribute(MAM_BOUND_ATTR)) return;
     tabList.setAttribute(MAM_BOUND_ATTR, "true");
     if (!sampleTab) return;
-    const {panelId, tabId} = getMamIds(tabList);
+    const { panelId, tabId } = getMamIds(tabList);
     const activeClassNames = getActiveClassNames(tabList, sampleTab);
     const mamTab = sampleTab.cloneNode(true) as HTMLElement;
     mamTab.setAttribute(MAM_TAB_ATTR, "");
@@ -942,7 +1008,7 @@ function injectMamTab(tabList: HTMLElement, sampleTab: HTMLElement, samplePanel:
 }
 
 function scanForPicker() {
-    for (const {tabList, sampleTab, samplePanel} of findPickerEntries()) {
+    for (const { tabList, sampleTab, samplePanel } of findPickerEntries()) {
         injectMamTab(tabList, sampleTab, samplePanel);
     }
 }
@@ -958,7 +1024,7 @@ async function ensureMamCsp() {
             body: "midevelopment.de has been added to the whitelist. Please restart the app for the changes to take effect.",
             confirmText: "Restart now",
             cancelText: "Later",
-            onConfirm: relaunch
+            onConfirm: relaunch,
         });
     }
 }
@@ -971,20 +1037,20 @@ export default definePlugin({
     name: "MAG",
     description: "Custom tab in media picker for gifs of the MAM project with list support.",
     authors: [
-        {name: "Miku", id: 293135882926555137n},
-        {name: "Ice", id: 788437114583777280n}
+        { name: "Miku", id: 293135882926555137n },
+        { name: "Ice", id: 788437114583777280n },
     ],
     settings,
     chatBarButton: {
         icon: MamIcon,
-        render: MamChatBarButton
+        render: MamChatBarButton,
     },
     start() {
         void ensureMamCsp();
         // Log available native plugin helpers so we can verify the handler key.
         console.log("[Mag] pluginHelpers keys:", Object.keys((VencordNative as any).pluginHelpers ?? {}));
         observer = new MutationObserver(scanForPicker);
-        observer.observe(document.body, {childList: true, subtree: true});
+        observer.observe(document.body, { childList: true, subtree: true });
         scanForPicker();
     },
     stop() {
@@ -992,5 +1058,5 @@ export default definePlugin({
         observer = null;
         for (const cleanup of cleanupFns) cleanup();
         cleanupFns.clear();
-    }
+    },
 });
