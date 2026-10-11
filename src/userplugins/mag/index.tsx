@@ -21,6 +21,7 @@ import {
     FluxDispatcher,
     MessageActions,
     React,
+    ReactDOM,
     SelectedChannelStore,
     showToast,
     useCallback,
@@ -33,6 +34,7 @@ import {
 const MAM_LABEL = "MAM";
 const MAM_TAB_ATTR = "data-vc-mam-tab";
 const MAM_PANEL_ATTR = "data-vc-mam-panel";
+const MAM_HEADER_ATTR = "data-vc-mam-header";
 const MAM_BOUND_ATTR = "data-vc-mam-bound";
 const MAM_PANEL_ID_ATTR = "data-vc-mam-panel-id";
 const MAM_TAB_ID_ATTR = "data-vc-mam-tab-id";
@@ -162,6 +164,7 @@ async function trackGifSend(gifId: number, query: string, apiKey: string) {
 
 const cleanupFns = new Map<HTMLElement, () => void>();
 const mamRoots = new Map<HTMLElement, MamRoot>();
+const mamHeaders = new Map<HTMLElement, { header: HTMLElement; layout: HTMLElement; content: HTMLElement }>();
 let observer: MutationObserver | null = null;
 let panelIdCounter = 0;
 let scanFrame = 0;
@@ -276,7 +279,7 @@ function MasonryGrid({ items, onSend, columnWidth = 140, gap = 8 }: MasonryGridP
 // MamView
 // ---------------------------------------------------------------------------
 
-function MamView() {
+function MamView({ header }: { header: HTMLElement }) {
     const { apiKey } = settings.use(["apiKey"]);
     const normalizedApiKey = apiKey.trim();
 
@@ -570,7 +573,7 @@ function MamView() {
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
             {/* Search bar */}
-            <div className="vc-mam-toolbar">
+            {ReactDOM.createPortal(<div className="vc-mam-toolbar">
                 {viewMode !== "categories" ? (
                     <button
                         type="button"
@@ -631,7 +634,7 @@ function MamView() {
                         ) : null}
                     </div>
                 ) : null}
-            </div>
+            </div>, header)}
 
             {error ? (
                 <div style={{ padding: "0 12px 8px", color: "var(--status-danger)" }}>
@@ -802,7 +805,7 @@ function setTabActiveState(tab: HTMLElement, active: boolean, activeClassNames: 
     }
 }
 
-function ensureMamPanel(samplePanel: HTMLElement, panelId: string): HTMLElement {
+function ensureMamPanel(tabList: HTMLElement, samplePanel: HTMLElement, panelId: string): HTMLElement {
     const panelContainer = samplePanel.parentElement ?? samplePanel;
     const orphanPanels = document.querySelectorAll<HTMLElement>(`[${MAM_PANEL_ATTR}][${MAM_OWNER_ATTR}='${panelId}']`);
     orphanPanels.forEach(panel => {
@@ -823,9 +826,30 @@ function ensureMamPanel(samplePanel: HTMLElement, panelId: string): HTMLElement 
         mamPanel.style.overflow = "hidden";
         mamPanel.innerHTML = "";
         panelContainer.appendChild(mamPanel);
+        const header = document.createElement("div");
+        header.setAttribute(MAM_HEADER_ATTR, "");
+        header.className = "vc-mam-header";
+        header.hidden = true;
+        let content = mamPanel;
+        while (content.parentElement && !content.parentElement.contains(tabList)) {
+            content = content.parentElement;
+        }
+        const layout = content.parentElement!;
+        content.before(header);
+        mamHeaders.set(mamPanel, { header, layout, content });
         const root = createRoot(mamPanel) as MamRoot;
-        root.render(<MamView />);
-        mamRoots.set(mamPanel, root);
+        root.render(<MamView header={header} />);
+        const panel = mamPanel;
+        mamRoots.set(panel, {
+            render: node => root.render(node),
+            unmount: () => {
+                root.unmount();
+                header.remove();
+                layout.classList.remove("vc-mam-picker-layout");
+                content.classList.remove("vc-mam-picker-content");
+                mamHeaders.delete(panel);
+            },
+        });
     }
     return mamPanel;
 }
@@ -835,8 +859,16 @@ function setMamActive(tabList: HTMLElement, samplePanel: HTMLElement, active: bo
     if (!resolvedPanel) return;
     const mamTab = tabList.querySelector<HTMLElement>(`[${MAM_TAB_ATTR}]`);
     const { panelId } = getMamIds(tabList);
-    const mamPanel = active ? ensureMamPanel(resolvedPanel, panelId) : document.getElementById(panelId);
+    const mamPanel = active ? ensureMamPanel(tabList, resolvedPanel, panelId) : document.getElementById(panelId);
     if (!mamPanel) return;
+    const headerLayout = mamHeaders.get(mamPanel);
+    if (headerLayout) {
+        const { header, layout, content } = headerLayout;
+        if (header.nextElementSibling !== content) content.before(header);
+        header.hidden = !active;
+        layout.classList.toggle("vc-mam-picker-layout", active);
+        content.classList.toggle("vc-mam-picker-content", active);
+    }
     const panelContainer = resolvedPanel.parentElement ?? resolvedPanel;
     const panels = panelContainer.querySelectorAll<HTMLElement>("[role='tabpanel']");
     panels.forEach(panel => {
@@ -1014,7 +1046,7 @@ export default definePlugin({
         // Log available native plugin helpers so we can verify the handler key.
         console.log("[Mag] pluginHelpers keys:", Object.keys((VencordNative as any).pluginHelpers ?? {}));
         observer = new MutationObserver(records => {
-            if (records.some(record => !(record.target instanceof Element && record.target.closest(`[${MAM_PANEL_ATTR}]`)))) {
+            if (records.some(record => !(record.target instanceof Element && record.target.closest(`[${MAM_PANEL_ATTR}], [${MAM_HEADER_ATTR}]`)))) {
                 schedulePickerScan();
             }
         });

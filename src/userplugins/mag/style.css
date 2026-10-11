@@ -1,9 +1,37 @@
+.vc-mam-picker-layout {
+    display: flex !important;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vc-mam-picker-layout > :not(.vc-mam-picker-content) {
+    flex-shrink: 0;
+}
+
+.vc-mam-picker-layout > .vc-mam-picker-content {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+}
+
+.vc-mam-header {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+}
+
+.vc-mam-header[hidden] {
+    display: none;
+}
+
 .vc-mam-toolbar {
     display: flex;
     flex-shrink: 0;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px 12px;
+    padding: 6px 16px 8px;
 }
 
 .vc-mam-search {
@@ -13,7 +41,7 @@
     gap: 8px;
     box-sizing: border-box;
     min-width: 0;
-    height: 36px;
+    height: 32px;
     padding: 0 8px 0 10px;
     border: 1px solid var(--input-border-default, var(--background-mod-strong, var(--background-modifier-accent)));
     border-radius: 8px;
@@ -78,8 +106,8 @@
 }
 
 .vc-mam-back-button {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: 8px;
 }
 
