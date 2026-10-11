@@ -21,7 +21,7 @@ import {
     MessageActions,
     React,
     SelectedChannelStore,
-    Toasts,
+    showToast,
     useCallback,
     useEffect,
     useLayoutEffect,
@@ -159,27 +159,12 @@ async function trackGifSend(gifId: number, query: string, apiKey: string) {
     }
 }
 
-const cleanupFns = new Set<() => void>();
-const mamRoots = new WeakMap<HTMLElement, MamRoot>();
+const cleanupFns = new Map<HTMLElement, () => void>();
+const mamRoots = new Map<HTMLElement, MamRoot>();
 let observer: MutationObserver | null = null;
 let panelIdCounter = 0;
-
-// ---------------------------------------------------------------------------
-// MasonryGrid
-// ---------------------------------------------------------------------------
-// Items are placed into columns AFTER their image has loaded, so the column
-// height accounting is always based on real pixel measurements — never on
-// guessed aspect-ratio estimates.  This eliminates the whitespace gaps that
-// appear when images are taller than estimated.
-//
-// Flow per item:
-//   1. An off-screen <img> is created to trigger the load.
-//   2. Once loaded (or on error), the item is inserted into the shortest
-//      column and the tracked height is updated from scrollHeight.
-//   3. New items added via "Load more" continue from where the previous batch
-//      left off; existing items are never touched.
-//   4. A full rebuild happens when the column count changes or when the item
-//      list resets (new search / list switch detected by list shrinking).
+let scanFrame = 0;
+let openMamUntil = 0;
 
 interface MasonryGridProps {
     items: MagGif[];
@@ -192,105 +177,96 @@ function MasonryGrid({ items, onSend, columnWidth = 140, gap = 8 }: MasonryGridP
     const containerRef = useRef<HTMLDivElement>(null);
     const columnRefs = useRef<HTMLDivElement[]>([]);
     const columnHeightsRef = useRef<number[]>([]);
+    const queuedIdsRef = useRef(new Set<number>());
+    const generationRef = useRef(0);
+    const onSendRef = useRef(onSend);
     const [columnCount, setColumnCount] = useState(3);
+    onSendRef.current = onSend;
 
-    // Set of GIF ids that have already been queued for placement.  Using a Set
-    // instead of a numeric counter means that a column-rebuild (which resets
-    // queuedRef to 0) cannot cause already-queued items to be re-inserted —
-    // the async loadPromise callbacks check the Set before touching the DOM.
-    const queuedIdsRef = useRef<Set<number>>(new Set());
-
-    // Recalculate column count on container resize.
     useLayoutEffect(() => {
         const container = containerRef.current;
         if (!container) return;
-        const ro = new ResizeObserver(entries => {
+        const resizeObserver = new ResizeObserver(entries => {
             const { width } = entries[0].contentRect;
-            const count = Math.max(1, Math.floor((width + gap) / (columnWidth + gap)));
-            setColumnCount(count);
+            if (width > 0) setColumnCount(Math.max(1, Math.floor((width + gap) / (columnWidth + gap))));
         });
-        ro.observe(container);
-        return () => ro.disconnect();
+        resizeObserver.observe(container);
+        return () => resizeObserver.disconnect();
     }, [columnWidth, gap]);
 
-    // Rebuild columns when column count changes or items reset.
     useLayoutEffect(() => {
         const container = containerRef.current;
         if (!container) return;
-        container.innerHTML = "";
+        container.replaceChildren();
         columnRefs.current = [];
         columnHeightsRef.current = [];
-        for (let i = 0; i < columnCount; i++) {
-            const col = document.createElement("div");
-            col.style.cssText = `display:flex;flex-direction:column;gap:${gap}px;flex:1 1 0;min-width:0;`;
-            container.appendChild(col);
-            columnRefs.current.push(col);
+        queuedIdsRef.current.clear();
+        for (let index = 0; index < columnCount; index++) {
+            const column = document.createElement("div");
+            column.style.cssText = `display:flex;flex-direction:column;gap:${gap}px;flex:1 1 0;min-width:0;`;
+            container.appendChild(column);
+            columnRefs.current.push(column);
             columnHeightsRef.current.push(0);
         }
-        // Clear the queued-ids set so items are re-placed into the fresh columns.
-        queuedIdsRef.current = new Set();
+        return () => {
+            generationRef.current++;
+            container.replaceChildren();
+        };
     }, [columnCount, gap]);
 
-    // Queue newly arrived items for placement.
     useLayoutEffect(() => {
+        const container = containerRef.current;
         const columns = columnRefs.current;
-        if (!columns.length) return;
+        if (!container || !columns.length) return;
+        const generation = generationRef.current;
+        const width = container.clientWidth > 0
+            ? (container.clientWidth - gap * (columns.length - 1)) / columns.length
+            : columnWidth;
 
-        const newItems = items.filter(gif => !queuedIdsRef.current.has(gif.id));
-        if (!newItems.length) return;
+        for (const gif of items) {
+            if (queuedIdsRef.current.has(gif.id)) continue;
+            queuedIdsRef.current.add(gif.id);
+            const shortestIndex = columnHeightsRef.current.indexOf(Math.min(...columnHeightsRef.current));
+            const column = columns[shortestIndex];
+            columnHeightsRef.current[shortestIndex] += width + gap;
 
-        // Mark all new items as queued immediately (synchronously) so that even
-        // if this effect runs again before any promise resolves, we never queue
-        // the same item twice.
-        for (const gif of newItems) queuedIdsRef.current.add(gif.id);
-
-        for (const gif of newItems) {
-            const loadPromise = new Promise<HTMLImageElement>(resolve => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = () => resolve(img);
-                img.src = gif.public_url;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.style.cssText = "border:none;padding:0;background:var(--background-tertiary);cursor:pointer;display:block;width:100%;border-radius:6px;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 140px;";
+            button.setAttribute("aria-label", "Send GIF");
+            button.title = "Send GIF";
+            const img = document.createElement("img");
+            img.alt = "";
+            img.loading = "lazy";
+            img.decoding = "async";
+            img.style.cssText = "display:block;width:100%;height:auto;aspect-ratio:1;";
+            let measuredHeight = width;
+            img.onload = () => {
+                if (generation !== generationRef.current || !img.naturalWidth) return;
+                img.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+                img.alt = "";
+                button.title = "Send GIF";
+                const height = width * img.naturalHeight / img.naturalWidth;
+                columnHeightsRef.current[shortestIndex] += height - measuredHeight;
+                measuredHeight = height;
+            };
+            img.onerror = () => {
+                if (generation !== generationRef.current) return;
+                img.alt = "Vorschau nicht verfügbar";
+                button.title = "Vorschau erneut laden";
+            };
+            button.addEventListener("click", () => {
+                if (!img.naturalWidth) {
+                    img.src = gif.public_url;
+                } else {
+                    onSendRef.current(gif);
+                }
             });
-
-            loadPromise.then(loadedImg => {
-                const container = containerRef.current;
-                if (!container) return;
-                const cols = columnRefs.current;
-                if (!cols.length) return;
-
-                const shortestIdx = columnHeightsRef.current.indexOf(Math.min(...columnHeightsRef.current));
-                const col = cols[shortestIdx];
-
-                const estimatedH =
-                    loadedImg.naturalHeight && loadedImg.naturalWidth
-                        ? (loadedImg.naturalHeight / loadedImg.naturalWidth) * columnWidth
-                        : 120;
-                columnHeightsRef.current[shortestIdx] += estimatedH + gap;
-
-                const btn = document.createElement("button");
-                btn.style.cssText =
-                    "border:none;padding:0;background:transparent;cursor:pointer;display:block;width:100%;";
-                btn.setAttribute("aria-label", "Send GIF");
-                btn.setAttribute("title", "Send GIF");
-                btn.addEventListener("click", () => onSend(gif));
-
-                const img = document.createElement("img");
-                img.src = loadedImg.src;
-                img.loading = "eager";
-                img.style.cssText = "display:block;width:100%;height:auto;border-radius:6px;";
-                img.addEventListener(
-                    "load",
-                    () => {
-                        columnHeightsRef.current[shortestIdx] = col.scrollHeight;
-                    },
-                    { once: true },
-                );
-
-                btn.appendChild(img);
-                col.appendChild(btn);
-            });
+            img.src = gif.public_url;
+            button.appendChild(img);
+            column.appendChild(button);
         }
-    });
+    }, [items, columnCount, columnWidth, gap]);
 
     return <div ref={containerRef} style={{ display: "flex", gap, width: "100%", alignItems: "flex-start" }} />;
 }
@@ -309,18 +285,15 @@ function MamView() {
     const [selectedListId, setSelectedListId] = useState<number | null>(null);
     const [viewMode, setViewMode] = useState<"categories" | "all" | "list">("categories");
     const [searchFocused, setSearchFocused] = useState(false);
-    const [listsLoading, setListsLoading] = useState(false);
+    const [listsLoading, setListsLoading] = useState(true);
     const [listsError, setListsError] = useState<string | null>(null);
     const [listPreviews, setListPreviews] = useState<Record<string, string | null>>({});
     const [items, setItems] = useState<MagGif[]>([]);
     const [error, setError] = useState<string | null>(null);
-    // Separate loading states: initial load vs. loading-more.
-    // This lets us keep the "Load more" button visible during pagination.
     const [initialLoading, setInitialLoading] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [page, setPage] = useState(1);
+    const loadNextRef = useRef<(() => void) | null>(null);
     const [hasMore, setHasMore] = useState(false);
-    const abortRef = useRef<AbortController | null>(null);
     const loadingMoreRef = useRef(false);
     // The scroll container itself — needed to attach the scroll listener.
     const scrollerRef = useRef<HTMLDivElement>(null);
@@ -330,11 +303,6 @@ function MamView() {
         const handle = setTimeout(() => setDebouncedQuery(query.trim()), 250);
         return () => clearTimeout(handle);
     }, [query]);
-
-    // Reset to page 1 when context changes.
-    useEffect(() => {
-        setPage(1);
-    }, [debouncedQuery, normalizedApiKey, selectedListId, viewMode]);
 
     // Auto-switch to "all" view when the user starts typing.
     useEffect(() => {
@@ -351,6 +319,7 @@ function MamView() {
             setListsLoading(false);
             return;
         }
+        let cancelled = false;
         setListsLoading(true);
         setListsError(null);
         const url = new URL("/api/gif-lists", API_BASE_URL);
@@ -361,167 +330,145 @@ function MamView() {
                 return res.data as GifListEntry[];
             })
             .then(data => {
-                setLists(Array.isArray(data) ? data : []);
+                if (!cancelled) setLists(Array.isArray(data) ? data : []);
             })
             .catch(err => {
+                if (cancelled) return;
                 setListsError(err instanceof Error ? err.message : "Failed to fetch lists.");
                 setLists([]);
             })
             .finally(() => {
-                setListsLoading(false);
+                if (!cancelled) setListsLoading(false);
             });
+        return () => { cancelled = true; };
     }, [normalizedApiKey]);
 
-    // Fetch preview thumbnails for each list.
     useEffect(() => {
-        if (!normalizedApiKey) {
-            setListPreviews({});
-            return;
-        }
-        (async () => {
-            const previews: Record<string, string | null> = {};
-            const fetchFirstGif = async (url: URL) => {
-                try {
-                    const res = await fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } });
-                    if (res.ok && Array.isArray(res.data.items) && res.data.items.length > 0) {
-                        return (res.data.items[0] as MagGif).public_url;
-                    }
-                } catch (_) {
-                    /* ignore */
-                }
-                return null;
-            };
-            const allUrl = new URL("/api/gifs", API_BASE_URL);
-            allUrl.searchParams.set("limit", "1");
-            allUrl.searchParams.set("page", "1");
-            allUrl.searchParams.set("nsfw", "false");
-            allUrl.searchParams.set("visibility", "published");
-            previews.all = await fetchFirstGif(allUrl);
-            for (const entry of lists) {
-                const url = new URL(`/api/gif-lists/${entry.id}/items`, API_BASE_URL);
+        let cancelled = false;
+        setListPreviews({});
+        if (!normalizedApiKey || listsLoading || listsError) return;
+        const entries = [{ id: null, key: "all" }, ...lists.map(entry => ({ id: entry.id, key: String(entry.id) }))];
+        const worker = async () => {
+            while (!cancelled && entries.length) {
+                const entry = entries.shift()!;
+                const url = new URL(entry.id === null ? "/api/gifs" : `/api/gif-lists/${entry.id}/items`, API_BASE_URL);
                 url.searchParams.set("limit", "1");
                 url.searchParams.set("page", "1");
                 url.searchParams.set("nsfw", "false");
-                previews[entry.id.toString()] = await fetchFirstGif(url);
+                if (entry.id === null) url.searchParams.set("visibility", "published");
+                try {
+                    const res = await fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } });
+                    const preview = res.ok ? res.data?.items?.[0]?.public_url ?? null : null;
+                    if (!cancelled) setListPreviews(previous => ({ ...previous, [entry.key]: preview }));
+                } catch {
+                    if (!cancelled) setListPreviews(previous => ({ ...previous, [entry.key]: null }));
+                }
             }
-            setListPreviews(previews);
-        })();
-    }, [lists, normalizedApiKey]);
+        };
+        void Promise.all(Array.from({ length: Math.min(4, entries.length) }, worker));
+        return () => { cancelled = true; };
+    }, [lists, listsLoading, listsError, normalizedApiKey]);
 
-    // Main data fetching effect.
     useEffect(() => {
-        abortRef.current?.abort();
-        if (viewMode === "categories") {
-            setInitialLoading(false);
-            setLoadingMore(false);
-            return;
-        }
+        let cancelled = false;
+        let nextPage = 1;
+        let pending = false;
+        const limit = 30;
+        setItems([]);
+        setError(null);
+        setHasMore(false);
+        setInitialLoading(false);
+        setLoadingMore(false);
+        loadingMoreRef.current = false;
+        scrollerRef.current?.scrollTo(0, 0);
+        loadNextRef.current = null;
         if (!normalizedApiKey) {
-            setInitialLoading(false);
-            setLoadingMore(false);
-            setItems([]);
-            setHasMore(false);
             setError("Set your MAM API key in the plugin settings.");
             return;
         }
-        const controller = new AbortController();
-        abortRef.current = controller;
-        const isPaginating = page > 1;
+        if (viewMode === "categories") return;
 
-        if (isPaginating) {
-            setLoadingMore(true);
-        } else {
-            setInitialLoading(true);
-            setItems([]); // Clear immediately on fresh load so the masonry resets.
-        }
-        setError(null);
-
-        // First page loads 20 GIFs for a full initial view; subsequent pages
-        // load 10 so that the infinite scroll trigger fires before the user
-        // reaches the very bottom, giving a seamless feel.
-        const limit = isPaginating ? 10 : 20;
-
-        let url: URL;
-        if (viewMode === "list" && selectedListId != null) {
-            url = new URL(`/api/gif-lists/${selectedListId}/items`, API_BASE_URL);
+        const loadPage = async () => {
+            if (cancelled || pending) return;
+            pending = true;
+            loadingMoreRef.current = true;
+            const requestedPage = nextPage;
+            const isPaginating = requestedPage > 1;
+            setInitialLoading(!isPaginating);
+            setLoadingMore(isPaginating);
+            setError(null);
+            const url = new URL(viewMode === "list" && selectedListId != null
+                ? `/api/gif-lists/${selectedListId}/items`
+                : "/api/gifs", API_BASE_URL);
             url.searchParams.set("limit", String(limit));
-            url.searchParams.set("page", String(page));
+            url.searchParams.set("page", String(requestedPage));
             url.searchParams.set("nsfw", "false");
-        } else {
-            url = new URL("/api/gifs", API_BASE_URL);
-            if (debouncedQuery) url.searchParams.set("q", debouncedQuery);
-            url.searchParams.set("limit", String(limit));
-            url.searchParams.set("page", String(page));
-            url.searchParams.set("nsfw", "false");
-            url.searchParams.set("visibility", "published");
-        }
-
-        fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } })
-            .then(res => {
-                if (!res.ok)
-                    throw new Error(res.status === 401 ? "Invalid API key." : `Request failed (${res.status}).`);
-                return res.data as MagResponse;
-            })
-            .then(data => {
-                if (controller.signal.aborted) return;
-                const nextItems = Array.isArray(data.items) ? data.items : [];
-                // For page 1 the items state was already cleared above, so we
-                // always set (never concat) here.  For page > 1 we append.
-                setItems(prev => (isPaginating ? [...prev, ...nextItems] : nextItems));
-                const hasMoreFromFlag =
-                    typeof data.pagination?.has_more === "boolean" ? data.pagination.has_more : null;
-                setHasMore(hasMoreFromFlag ?? data.pagination?.next_page != null);
-            })
-            .catch(err => {
-                if (controller.signal.aborted) return;
-                setError(err instanceof Error ? err.message : "Request failed.");
-                if (!isPaginating) setItems([]);
-                setHasMore(false);
-            })
-            .finally(() => {
-                if (controller.signal.aborted) return;
-                setInitialLoading(false);
-                setLoadingMore(false);
-                loadingMoreRef.current = false;
-            });
-
-        return () => controller.abort();
-    }, [normalizedApiKey, debouncedQuery, selectedListId, page, viewMode]);
-
-    // Infinite scroll via scroll event on the scroller container.
-    // This is more reliable than IntersectionObserver in this context because
-    // the observer only fires on transitions and can miss cases where the
-    // sentinel is already visible after a new batch loads.
-    // We trigger when the user is within 600px of the bottom.
-    useEffect(() => {
-        const scroller = scrollerRef.current;
-        if (!scroller) return;
-
-        const check = () => {
-            if (!hasMore || loadingMoreRef.current || initialLoading) return;
-
-            const distanceFromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
-
-            if (distanceFromBottom < 600) {
-                loadingMoreRef.current = true;
-                setPage(p => p + 1);
+            if (viewMode === "all") {
+                if (debouncedQuery) url.searchParams.set("q", debouncedQuery);
+                url.searchParams.set("visibility", "published");
+            }
+            try {
+                const res = await fetchMagApi(url.toString(), { headers: { "X-API-Key": normalizedApiKey } });
+                if (cancelled) return;
+                if (!res.ok) throw new Error(res.status === 401 ? "Invalid API key." : `Request failed (${res.status}).`);
+                const data = res.data as MagResponse;
+                if (!Array.isArray(data?.items)) throw new Error("Invalid GIF response.");
+                const nextItems = data.items;
+                setItems(previous => {
+                    const unique = new Map(previous.map(gif => [gif.id, gif]));
+                    for (const gif of nextItems) unique.set(gif.id, gif);
+                    return [...unique.values()];
+                });
+                const serverNext = data.pagination?.next_page;
+                const more = nextItems.length > 0 && (data.pagination?.has_more
+                    ?? (serverNext !== undefined ? serverNext !== null : nextItems.length >= limit));
+                nextPage = typeof serverNext === "number" && Number.isInteger(serverNext) && serverNext > requestedPage
+                    ? serverNext : requestedPage + 1;
+                setHasMore(more);
+                if (!more) loadNextRef.current = null;
+            } catch (err) {
+                if (!cancelled) setError(err instanceof Error ? err.message : "Request failed.");
+            } finally {
+                if (!cancelled) {
+                    pending = false;
+                    loadingMoreRef.current = false;
+                    setInitialLoading(false);
+                    setLoadingMore(false);
+                }
             }
         };
-
-        check();
-
-        scroller.addEventListener("scroll", check, { passive: true });
-
+        loadNextRef.current = () => { void loadPage(); };
+        void loadPage();
         return () => {
+            cancelled = true;
+            loadNextRef.current = null;
+        };
+    }, [normalizedApiKey, debouncedQuery, selectedListId, viewMode]);
+
+    useEffect(() => {
+        const scroller = scrollerRef.current;
+        if (!scroller || viewMode === "categories" || error) return;
+        const check = () => {
+            if (!hasMore || loadingMoreRef.current || initialLoading || !scroller.clientHeight) return;
+            const distanceFromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+            if (distanceFromBottom < Math.max(1200, scroller.clientHeight * 2)) loadNextRef.current?.();
+        };
+        const resizeObserver = new ResizeObserver(check);
+        resizeObserver.observe(scroller);
+        if (scroller.firstElementChild) resizeObserver.observe(scroller.firstElementChild);
+        scroller.addEventListener("scroll", check, { passive: true });
+        check();
+        return () => {
+            resizeObserver.disconnect();
             scroller.removeEventListener("scroll", check);
         };
-    }, [hasMore, initialLoading]);
+    }, [hasMore, initialLoading, loadingMore, items, viewMode, error]);
 
     const onSend = useCallback(
         (gif: MagGif) => {
             const channelId = SelectedChannelStore.getChannelId();
             if (!channelId) {
-                Toasts.show({ message: "No channel selected.", id: Toasts.genId(), type: Toasts.Type.FAILURE });
+                showToast("No channel selected.", "failure");
                 return;
             }
             const reply = PendingReplyStore.getPendingReply(channelId);
@@ -529,6 +476,8 @@ function MamView() {
             void sendMessage(channelId, { content: gif.public_url }, true, replyOptions ?? {}).then(() => {
                 if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
                 void trackGifSend(gif.id, debouncedQuery, normalizedApiKey);
+            }).catch(() => {
+                showToast("GIF could not be sent.", "failure");
             });
             ExpressionPickerStore.closeExpressionPicker();
         },
@@ -668,7 +617,7 @@ function MamView() {
                             placeholder="GIFs durchsuchen"
                             onChange={event => setQuery(event.currentTarget.value)}
                             onKeyDown={event => {
-                                if (event.key === "Enter") setPage(1);
+                                if (event.key === "Enter") setDebouncedQuery(query.trim());
                             }}
                             onFocus={() => setSearchFocused(true)}
                             onBlur={() => setSearchFocused(false)}
@@ -704,12 +653,19 @@ function MamView() {
                 ) : null}
             </div>
 
-            {error ? <div style={{ padding: "0 12px 8px", color: "var(--status-danger)" }}>{error}</div> : null}
+            {error ? (
+                <div style={{ padding: "0 12px 8px", color: "var(--status-danger)" }}>
+                    {error}
+                    {normalizedApiKey && !showCategories ? (
+                        <Button size={Button.Sizes.SMALL} onClick={() => loadNextRef.current?.()}>Erneut versuchen</Button>
+                    ) : null}
+                </div>
+            ) : null}
 
             {/* Content area */}
             <div
                 ref={scrollerRef}
-                style={{ flex: 1, overflow: "auto" }}
+                style={{ flex: 1, minHeight: 0, overflow: "auto" }}
                 className={`${scrollerClasses.scrollerBase} ${scrollerClasses.thin} ${scrollerClasses.fade}`}
             >
                 <div style={{ padding: "8px 16px 12px" }}>
@@ -774,14 +730,8 @@ const MamChatBarButton: ChatBarButtonFactory = ({ isMainChat }) => {
     if (!isMainChat) return null;
     const handleClick = () => {
         ComponentDispatch.dispatch("TOGGLE_GIF_PICKER");
-        setTimeout(() => {
-            const entries = findPickerEntries();
-            if (entries.length > 0) {
-                const { tabList, sampleTab, samplePanel } = entries[0];
-                const activeClassNames = getActiveClassNames(tabList, sampleTab);
-                setMamActive(tabList, samplePanel, true, activeClassNames);
-            }
-        }, 0);
+        openMamUntil = Date.now() + 1500;
+        schedulePickerScan();
     };
     return (
         <ChatBarButton tooltip="MAM GIFs" onClick={handleClick}>
@@ -799,6 +749,7 @@ function findPickerEntries() {
     const seen = new Set<HTMLElement>();
     const panels = document.querySelectorAll<HTMLElement>("[id$=\"picker-tab-panel\"], [id*='picker-tab-panel']");
     for (const panel of panels) {
+        if (panel.hasAttribute(MAM_PANEL_ATTR)) continue;
         const tab =
             document.querySelector<HTMLElement>(`[role="tab"][aria-controls="${panel.id}"]`) ??
             document.querySelector<HTMLElement>(`[aria-controls="${panel.id}"]`);
@@ -826,7 +777,7 @@ function getMamIds(tabList: HTMLElement) {
 
 function resolveSamplePanel(tabList: HTMLElement, fallback?: HTMLElement) {
     const activeTab =
-        tabList.querySelector<HTMLElement>("[role='tab'][aria-selected='true'], [role='tab'][aria-current='page']") ??
+        tabList.querySelector<HTMLElement>("[role='tab'][aria-selected='true']:not([data-vc-mam-tab]), [role='tab'][aria-current='page']:not([data-vc-mam-tab])") ??
         tabList.querySelector<HTMLElement>("[role='tab']:not([data-vc-mam-tab])") ??
         tabList.querySelector<HTMLElement>("[role='tab']");
     const panelId = activeTab?.getAttribute("aria-controls");
@@ -903,13 +854,15 @@ function setMamActive(tabList: HTMLElement, samplePanel: HTMLElement, active: bo
     const resolvedPanel = resolveSamplePanel(tabList, samplePanel);
     if (!resolvedPanel) return;
     const mamTab = tabList.querySelector<HTMLElement>(`[${MAM_TAB_ATTR}]`);
-    const mamPanel = ensureMamPanel(resolvedPanel, getMamIds(tabList).panelId);
+    const { panelId } = getMamIds(tabList);
+    const mamPanel = active ? ensureMamPanel(resolvedPanel, panelId) : document.getElementById(panelId);
+    if (!mamPanel) return;
     const panelContainer = resolvedPanel.parentElement ?? resolvedPanel;
     const panels = panelContainer.querySelectorAll<HTMLElement>("[role='tabpanel']");
     panels.forEach(panel => {
         if (panel === mamPanel) return;
         if (active) {
-            if (panel.style.display !== "none") panel.dataset.vcMamDisplay = panel.style.display;
+            if (panel.dataset.vcMamDisplay === undefined) panel.dataset.vcMamDisplay = panel.style.display;
             if (panel.dataset.vcMamHidden === undefined)
                 panel.dataset.vcMamHidden = panel.hasAttribute("hidden") ? "1" : "0";
             panel.style.display = "none";
@@ -956,7 +909,11 @@ function injectMamTab(tabList: HTMLElement, sampleTab: HTMLElement, samplePanel:
         event.stopPropagation();
         event.stopImmediatePropagation?.();
         setMamActive(tabList, samplePanel, true, activeClassNames);
-        requestAnimationFrame(() => setMamActive(tabList, samplePanel, true, activeClassNames));
+        requestAnimationFrame(() => {
+            if (tabList.isConnected && tabList.hasAttribute(MAM_BOUND_ATTR)) {
+                setMamActive(tabList, samplePanel, true, activeClassNames);
+            }
+        });
     };
     const onMamMouseDown = (event: MouseEvent) => {
         event.preventDefault();
@@ -992,6 +949,11 @@ function injectMamTab(tabList: HTMLElement, sampleTab: HTMLElement, samplePanel:
                 panelEl.style.display = panelEl.dataset.vcMamDisplay;
                 delete panelEl.dataset.vcMamDisplay;
             }
+            if (panelEl.dataset.vcMamHidden !== undefined) {
+                if (panelEl.dataset.vcMamHidden === "1") panelEl.setAttribute("hidden", "");
+                else panelEl.removeAttribute("hidden");
+                delete panelEl.dataset.vcMamHidden;
+            }
         });
         const mamPanel = panelContainer.querySelector<HTMLElement>(`[${MAM_PANEL_ATTR}]`);
         if (mamPanel) {
@@ -1003,14 +965,36 @@ function injectMamTab(tabList: HTMLElement, sampleTab: HTMLElement, samplePanel:
         tabList.removeAttribute(MAM_BOUND_ATTR);
         tabList.removeAttribute(MAM_PANEL_ID_ATTR);
         tabList.removeAttribute(MAM_TAB_ID_ATTR);
+        cleanupFns.delete(tabList);
     };
-    cleanupFns.add(cleanup);
+    cleanupFns.set(tabList, cleanup);
 }
 
 function scanForPicker() {
+    for (const [tabList, cleanup] of cleanupFns) {
+        if (!tabList.isConnected) cleanup();
+    }
+    for (const [panel, root] of mamRoots) {
+        if (!panel.isConnected) {
+            root.unmount();
+            mamRoots.delete(panel);
+        }
+    }
     for (const { tabList, sampleTab, samplePanel } of findPickerEntries()) {
         injectMamTab(tabList, sampleTab, samplePanel);
+        if (Date.now() < openMamUntil) {
+            openMamUntil = 0;
+            setMamActive(tabList, samplePanel, true, getActiveClassNames(tabList, sampleTab));
+        }
     }
+}
+
+function schedulePickerScan() {
+    if (scanFrame) return;
+    scanFrame = requestAnimationFrame(() => {
+        scanFrame = 0;
+        scanForPicker();
+    });
 }
 
 async function ensureMamCsp() {
@@ -1049,14 +1033,27 @@ export default definePlugin({
         void ensureMamCsp();
         // Log available native plugin helpers so we can verify the handler key.
         console.log("[Mag] pluginHelpers keys:", Object.keys((VencordNative as any).pluginHelpers ?? {}));
-        observer = new MutationObserver(scanForPicker);
+        observer = new MutationObserver(records => {
+            if (records.some(record => !(record.target instanceof Element && record.target.closest(`[${MAM_PANEL_ATTR}]`)))) {
+                schedulePickerScan();
+            }
+        });
         observer.observe(document.body, { childList: true, subtree: true });
         scanForPicker();
     },
     stop() {
         observer?.disconnect();
         observer = null;
-        for (const cleanup of cleanupFns) cleanup();
+        cancelAnimationFrame(scanFrame);
+        scanFrame = 0;
+        openMamUntil = 0;
+        for (const cleanup of cleanupFns.values()) cleanup();
         cleanupFns.clear();
+        for (const [panel, root] of mamRoots) {
+            root.unmount();
+            panel.remove();
+        }
+        mamRoots.clear();
+        nativeHandler = null;
     },
 });

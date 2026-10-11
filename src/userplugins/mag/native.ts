@@ -12,9 +12,11 @@ export async function fetchMagApi(
     options?: RequestInit & { headers?: Record<string, string> }
 ) {
     try {
-        console.log("[MAM] Native request:", url);
-
-        const res = await fetch(url, options);
+        const target = new URL(url);
+        if (target.origin !== "https://api.midevelopment.de" || !target.pathname.startsWith("/api/")) {
+            throw new Error("Unsupported MAM API URL.");
+        }
+        const res = await fetch(target, { ...options, redirect: "error", signal: AbortSignal.timeout(15000) });
         const text = await res.text();
 
         let data: unknown = null;
