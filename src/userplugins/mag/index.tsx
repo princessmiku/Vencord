@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./style.css";
+
 import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { definePluginSettings } from "@api/Settings";
-import { ReplyIcon } from "@components/Icons";
 import { sendMessage } from "@utils/discord";
 import { relaunch } from "@utils/native";
 import definePlugin, { OptionType } from "@utils/types";
@@ -284,7 +285,7 @@ function MamView() {
     const [lists, setLists] = useState<GifListEntry[]>([]);
     const [selectedListId, setSelectedListId] = useState<number | null>(null);
     const [viewMode, setViewMode] = useState<"categories" | "all" | "list">("categories");
-    const [searchFocused, setSearchFocused] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
     const [listsLoading, setListsLoading] = useState(true);
     const [listsError, setListsError] = useState<string | null>(null);
     const [listPreviews, setListPreviews] = useState<Record<string, string | null>>({});
@@ -569,43 +570,32 @@ function MamView() {
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
             {/* Search bar */}
-            <div style={{ padding: "8px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="vc-mam-toolbar">
                 {viewMode !== "categories" ? (
-                    <Button
-                        size={Button.Sizes.SMALL}
-                        aria-label="Zurück"
+                    <button
+                        type="button"
+                        className="vc-mam-icon-button vc-mam-back-button"
+                        aria-label="Zurück zu den Kategorien"
+                        title="Zurück zu den Kategorien"
                         onClick={() => {
                             setQuery("");
                             setSelectedListId(null);
                             setViewMode("categories");
                         }}
                     >
-                        <ReplyIcon width={18} height={18} />
-                    </Button>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m10 5-7 7 7 7M3 12h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
                 ) : null}
                 {viewMode !== "list" ? (
-                    <div
-                        style={{
-                            flex: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            height: 32,
-                            padding: "0 10px",
-                            borderRadius: 16,
-                            backgroundColor: "var(--background-secondary)",
-                            border: "1px solid var(--background-tertiary)",
-                            boxShadow: searchFocused ? "0 0 0 2px var(--brand-500)" : "none",
-                            transition: "box-shadow 0.15s ease, border-color 0.15s ease",
-                        }}
-                    >
+                    <div className="vc-mam-search">
                         <svg
-                            width="16"
-                            height="16"
+                            className="vc-mam-search-icon"
+                            width="20"
+                            height="20"
                             viewBox="0 0 24 24"
-                            role="img"
                             aria-hidden="true"
-                            style={{ color: "var(--text-muted)", flex: "0 0 auto" }}
                         >
                             <path
                                 fill="currentColor"
@@ -613,40 +603,30 @@ function MamView() {
                             />
                         </svg>
                         <input
+                            ref={searchInputRef}
+                            className="vc-mam-search-input"
                             value={query}
                             placeholder="GIFs durchsuchen"
                             onChange={event => setQuery(event.currentTarget.value)}
                             onKeyDown={event => {
                                 if (event.key === "Enter") setDebouncedQuery(query.trim());
                             }}
-                            onFocus={() => setSearchFocused(true)}
-                            onBlur={() => setSearchFocused(false)}
                             aria-label="GIFs durchsuchen"
-                            style={{
-                                flex: 1,
-                                height: "100%",
-                                background: "transparent",
-                                border: "none",
-                                color: "var(--input-text-default)",
-                                fontSize: 14,
-                                outline: "none",
-                            }}
                         />
                         {query ? (
                             <button
-                                onClick={() => setQuery("")}
-                                aria-label="Suche löschen"
-                                style={{
-                                    border: "none",
-                                    background: "transparent",
-                                    color: "var(--text-muted)",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                    fontSize: 16,
-                                    lineHeight: 1,
+                                type="button"
+                                className="vc-mam-icon-button vc-mam-clear-button"
+                                onClick={() => {
+                                    setQuery("");
+                                    searchInputRef.current?.focus();
                                 }}
+                                aria-label="Suche löschen"
+                                title="Suche löschen"
                             >
-                                ×
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
                             </button>
                         ) : null}
                     </div>

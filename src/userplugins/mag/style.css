@@ -1,0 +1,89 @@
+.vc-mam-toolbar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px 12px;
+}
+
+.vc-mam-search {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    min-width: 0;
+    height: 36px;
+    padding: 0 8px 0 10px;
+    border: 1px solid var(--input-border-default, var(--background-mod-strong, var(--background-modifier-accent)));
+    border-radius: 8px;
+    background: var(--input-background-default, var(--background-tertiary));
+}
+
+.vc-mam-search:focus-within {
+    border-color: var(--focus-primary, var(--brand-500));
+    outline: 2px solid var(--focus-primary, var(--brand-500));
+    outline-offset: 1px;
+}
+
+.vc-mam-search-icon {
+    flex-shrink: 0;
+    color: var(--interactive-icon-default, var(--interactive-normal, var(--text-default)));
+}
+
+.vc-mam-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--input-text-default, var(--text-default, var(--text-normal)));
+    font: inherit;
+    font-size: 14px;
+}
+
+.vc-mam-search-input::placeholder {
+    color: var(--input-placeholder-text-default, var(--text-muted));
+    opacity: 1;
+}
+
+.vc-mam-icon-button {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--interactive-icon-default, var(--interactive-normal, var(--text-default)));
+    cursor: pointer;
+}
+
+.vc-mam-icon-button:hover {
+    background: var(--background-mod-subtle, var(--background-modifier-hover));
+    color: var(--interactive-icon-hover, var(--interactive-hover, var(--text-default)));
+}
+
+.vc-mam-icon-button:active {
+    background: var(--background-mod-strong, var(--background-modifier-active));
+    color: var(--interactive-icon-active, var(--interactive-active, var(--text-default)));
+}
+
+.vc-mam-icon-button:focus-visible {
+    outline: 2px solid var(--focus-primary, var(--brand-500));
+    outline-offset: 2px;
+}
+
+.vc-mam-back-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+}
+
+.vc-mam-clear-button {
+    width: 24px;
+    height: 24px;
+}
