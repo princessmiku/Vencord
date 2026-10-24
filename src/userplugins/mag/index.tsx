@@ -172,10 +172,9 @@ let panelIdCounter = 0;
 let scanFrame = 0;
 let openMamUntil = 0;
 
-function GifListContextMenu({ gif, apiKey, height, onAdded }: {
+function GifListContextMenu({ gif, apiKey, onAdded }: {
     gif: MagGif;
     apiKey: string;
-    height: number;
     onAdded: (listId: number) => void;
 }) {
     const [lists, setLists] = useState<GifListEntry[]>([]);
@@ -231,7 +230,6 @@ function GifListContextMenu({ gif, apiKey, height, onAdded }: {
         <Menu.Menu
             navId="vc-mam-gif-lists"
             className="vc-mam-list-menu"
-            style={{ height, minHeight: height }}
             hideScroller
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="GIF zu Liste hinzufügen"
@@ -802,11 +800,9 @@ function MamView({ header }: { header: HTMLElement }) {
                                     items={items}
                                     onSend={onSend}
                                     onContextMenu={(event, gif) => {
-                                        const panel = scrollerRef.current?.closest<HTMLElement>(`[${MAM_PANEL_ATTR}]`);
-                                        if (!panel) return;
-                                        const pickerBounds = panel.getBoundingClientRect();
+                                        const pickerBounds = header.parentElement!.getBoundingClientRect();
                                         const menuWidth = Math.min(290, window.innerWidth - 32);
-                                        const menuHeight = Math.min(pickerBounds.height, window.innerHeight - 32);
+                                        const menuHeight = Math.min(420, window.innerHeight - 32);
                                         const clientX = Math.max(16, pickerBounds.left - menuWidth - 12);
                                         const clientY = Math.max(16, Math.min(pickerBounds.top, window.innerHeight - menuHeight - 16));
                                         const anchoredEvent = Object.assign(Object.create(event), {
@@ -819,7 +815,6 @@ function MamView({ header }: { header: HTMLElement }) {
                                             <GifListContextMenu
                                                 gif={gif}
                                                 apiKey={normalizedApiKey}
-                                                height={menuHeight}
                                                 onAdded={listId => setLists(previous => previous.map(list =>
                                                     list.id === listId ? { ...list, gif_count: list.gif_count + 1 } : list
                                                 ))}

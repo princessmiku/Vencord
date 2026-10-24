@@ -121,7 +121,9 @@
     width: 290px;
     min-width: 0;
     max-width: calc(100vw - 32px);
-    max-height: calc(100dvh - 32px);
+    height: min(420px, calc(100dvh - 32px));
+    min-height: min(420px, calc(100dvh - 32px));
+    max-height: min(420px, calc(100dvh - 32px));
     overflow: hidden auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
