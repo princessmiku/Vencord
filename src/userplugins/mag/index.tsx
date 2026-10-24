@@ -16,9 +16,11 @@ import {
     Alerts,
     Button,
     ComponentDispatch,
+    ContextMenuApi,
     createRoot,
     ExpressionPickerStore,
     FluxDispatcher,
+    Menu,
     MessageActions,
     React,
     ReactDOM,
@@ -170,14 +172,127 @@ let panelIdCounter = 0;
 let scanFrame = 0;
 let openMamUntil = 0;
 
+function GifListContextMenu({ gif, apiKey, height, onAdded }: {
+    gif: MagGif;
+    apiKey: string;
+    height: number;
+    onAdded: (listId: number) => void;
+}) {
+    const [lists, setLists] = useState<GifListEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const pendingRef = useRef(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const url = new URL("/api/gif-lists", API_BASE_URL);
+        url.searchParams.set("gif_id", String(gif.id));
+        fetchMagApi(url.toString(), { headers: { "X-API-Key": apiKey } })
+            .then(res => {
+                if (!res.ok || !Array.isArray(res.data))
+                    throw new Error(res.status === 401 ? "Ungültiger API-Schlüssel." : "Listen konnten nicht geladen werden.");
+                if (!cancelled) setLists(res.data);
+            })
+            .catch(err => {
+                if (!cancelled) setError(err instanceof Error ? err.message : "Listen konnten nicht geladen werden.");
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [gif.id, apiKey]);
+
+    async function addToList(list: GifListEntry) {
+        if (pendingRef.current || list.contains) return;
+        pendingRef.current = true;
+        try {
+            const url = new URL(`/api/gif-lists/${list.id}/items`, API_BASE_URL);
+            const res = await fetchMagApi(url.toString(), {
+                method: "POST",
+                headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
+                body: JSON.stringify({ gif_id: gif.id }),
+            });
+            if (!res.ok) throw new Error(res.status === 401 ? "Ungültiger API-Schlüssel." : "GIF konnte nicht hinzugefügt werden.");
+            if (res.data?.detail === "exists") {
+                showToast({ text: `GIF ist bereits in „${list.name}“ enthalten.` });
+            } else {
+                onAdded(list.id);
+                showToast({ text: `GIF zu „${list.name}“ hinzugefügt.`, variant: "success" });
+            }
+            setLists(previous => previous.map(entry => entry.id === list.id ? { ...entry, contains: true } : entry));
+        } catch (err) {
+            showToast({ text: err instanceof Error ? err.message : "GIF konnte nicht hinzugefügt werden.", variant: "critical" });
+        } finally {
+            pendingRef.current = false;
+        }
+    }
+
+    return (
+        <Menu.Menu
+            navId="vc-mam-gif-lists"
+            className="vc-mam-list-menu"
+            style={{ height, minHeight: height }}
+            hideScroller
+            onClose={ContextMenuApi.closeContextMenu}
+            aria-label="GIF zu Liste hinzufügen"
+        >
+            <Menu.MenuGroup label={`GIF #${gif.id}`}>
+                <Menu.MenuItem
+                    id="mam-open-in-browser"
+                    label="GIF im Browser öffnen"
+                    action={() => VencordNative.native.openExternal(`https://www.midevelopment.de/mag/gifs/${gif.id}`)}
+                />
+            </Menu.MenuGroup>
+            <Menu.MenuGroup label={loading ? "Zu Liste hinzufügen" : `Zu Liste hinzufügen · ${lists.length}`}>
+                {loading ? <Menu.MenuItem id="mam-loading" label="Listen werden geladen…" disabled />
+                    : error ? <Menu.MenuItem id="mam-error" label={error} disabled />
+                        : lists.length === 0 ? <Menu.MenuItem id="mam-empty" label="Noch keine Listen vorhanden" disabled />
+                            : lists.map(list => (
+                                <Menu.MenuItem
+                                    key={list.id}
+                                    id={`mam-list-${list.id}`}
+                                    label={
+                                        <span className="vc-mam-list-menu-row" title={list.name}>
+                                            <span className={`vc-mam-list-menu-icon${list.contains ? " vc-mam-list-menu-added" : ""}`}>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <path
+                                                        d={list.contains ? "m5 12 4 4L19 6" : "M4 5h16M4 12h10M4 19h10m5-10v10m-5-5h10"}
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.8"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    />
+                                                </svg>
+                                            </span>
+                                            <span className="vc-mam-list-menu-text">
+                                                <span className="vc-mam-list-menu-name">{list.name}</span>
+                                                <span className="vc-mam-list-menu-hint">
+                                                    {list.contains ? "Bereits enthalten" : "GIF hinzufügen"}
+                                                </span>
+                                            </span>
+                                            <span className="vc-mam-list-menu-count" aria-label={`${list.gif_count} GIFs`}>
+                                                {list.gif_count}
+                                            </span>
+                                        </span>
+                                    }
+                                    disabled={list.contains}
+                                    action={() => { void addToList(list); }}
+                                />
+                            ))}
+            </Menu.MenuGroup>
+        </Menu.Menu>
+    );
+}
+
 interface MasonryGridProps {
     items: MagGif[];
     onSend: (gif: MagGif) => void;
+    onContextMenu: (event: React.MouseEvent, gif: MagGif) => void;
     columnWidth?: number;
     gap?: number;
 }
 
-function MasonryGrid({ items, onSend, columnWidth = 140, gap = 8 }: MasonryGridProps) {
+function MasonryGrid({ items, onSend, onContextMenu, columnWidth = 140, gap = 8 }: MasonryGridProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnRefs = useRef<HTMLDivElement[]>([]);
     const columnHeightsRef = useRef<number[]>([]);
@@ -236,6 +351,7 @@ function MasonryGrid({ items, onSend, columnWidth = 140, gap = 8 }: MasonryGridP
 
             const button = document.createElement("button");
             button.type = "button";
+            button.dataset.mamGifId = String(gif.id);
             button.style.cssText = "border:none;padding:0;background:var(--background-tertiary);cursor:pointer;display:block;width:100%;border-radius:6px;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 140px;";
             button.setAttribute("aria-label", "Send GIF");
             button.title = "Send GIF";
@@ -272,7 +388,18 @@ function MasonryGrid({ items, onSend, columnWidth = 140, gap = 8 }: MasonryGridP
         }
     }, [items, columnCount, columnWidth, gap]);
 
-    return <div ref={containerRef} style={{ display: "flex", gap, width: "100%", alignItems: "flex-start" }} />;
+    return <div
+        ref={containerRef}
+        style={{ display: "flex", gap, width: "100%", alignItems: "flex-start" }}
+        onContextMenu={event => {
+            const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-mam-gif-id]");
+            const gif = items.find(item => String(item.id) === button?.dataset.mamGifId);
+            if (!gif) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onContextMenu(event, gif);
+        }}
+    />;
 }
 
 // ---------------------------------------------------------------------------
@@ -671,7 +798,33 @@ function MamView({ header }: { header: HTMLElement }) {
                                     {selectedListId === null ? "No results." : "No items in this list."}
                                 </div>
                             ) : (
-                                <MasonryGrid items={items} onSend={onSend} />
+                                <MasonryGrid
+                                    items={items}
+                                    onSend={onSend}
+                                    onContextMenu={(event, gif) => {
+                                        const pickerBounds = header.parentElement!.getBoundingClientRect();
+                                        const menuWidth = Math.min(290, window.innerWidth - 32);
+                                        const menuHeight = Math.min(pickerBounds.height, window.innerHeight - 32);
+                                        const clientX = Math.max(16, pickerBounds.left - menuWidth - 12);
+                                        const clientY = Math.max(16, Math.min(pickerBounds.top, window.innerHeight - menuHeight - 16));
+                                        const anchoredEvent = Object.assign(Object.create(event), {
+                                            clientX,
+                                            clientY,
+                                            pageX: clientX + window.scrollX,
+                                            pageY: clientY + window.scrollY,
+                                        });
+                                        ContextMenuApi.openContextMenu(anchoredEvent, () => (
+                                            <GifListContextMenu
+                                                gif={gif}
+                                                apiKey={normalizedApiKey}
+                                                height={menuHeight}
+                                                onAdded={listId => setLists(previous => previous.map(list =>
+                                                    list.id === listId ? { ...list, gif_count: list.gif_count + 1 } : list
+                                                ))}
+                                            />
+                                        ));
+                                    }}
+                                />
                             )}
                             {/* Subtle loading indicator while fetching the next batch */}
                             {loadingMore ? (

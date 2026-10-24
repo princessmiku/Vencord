@@ -115,3 +115,92 @@
     width: 24px;
     height: 24px;
 }
+
+.vc-mam-list-menu {
+    box-sizing: border-box;
+    width: 290px;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--background-mod-strong, var(--background-modifier-accent)) transparent;
+    border: 1px solid var(--background-mod-strong, var(--background-modifier-accent));
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+}
+
+.vc-mam-list-menu > div,
+.vc-mam-list-menu [role="group"],
+.vc-mam-list-menu [role="menuitem"] {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.vc-mam-list-menu [role="menuitem"] {
+    border-radius: 8px;
+}
+
+.vc-mam-list-menu [role="menuitem"] :has(.vc-mam-list-menu-row) {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.vc-mam-list-menu-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 4px 0;
+}
+
+.vc-mam-list-menu-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--background-mod-subtle, var(--background-modifier-hover));
+}
+
+.vc-mam-list-menu-added {
+    color: var(--status-positive);
+}
+
+.vc-mam-list-menu-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.vc-mam-list-menu-name {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-mam-list-menu-hint {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.vc-mam-list-menu-count {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: var(--background-mod-subtle, var(--background-modifier-hover));
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
