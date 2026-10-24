@@ -802,7 +802,9 @@ function MamView({ header }: { header: HTMLElement }) {
                                     items={items}
                                     onSend={onSend}
                                     onContextMenu={(event, gif) => {
-                                        const pickerBounds = header.parentElement!.getBoundingClientRect();
+                                        const panel = scrollerRef.current?.closest<HTMLElement>(`[${MAM_PANEL_ATTR}]`);
+                                        if (!panel) return;
+                                        const pickerBounds = panel.getBoundingClientRect();
                                         const menuWidth = Math.min(290, window.innerWidth - 32);
                                         const menuHeight = Math.min(pickerBounds.height, window.innerHeight - 32);
                                         const clientX = Math.max(16, pickerBounds.left - menuWidth - 12);
