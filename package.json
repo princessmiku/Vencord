@@ -77,7 +77,7 @@
         "typescript-transform-paths": "catalog:",
         "zip-local": "catalog:"
     },
-    "packageManager": "pnpm@12.15.0",
+    "packageManager": "pnpm@12.18.0",
     "engines": {
         "node": ">=22"
     }

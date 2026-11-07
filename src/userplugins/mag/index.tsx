@@ -14,7 +14,6 @@ import definePlugin, { OptionType } from "@utils/types";
 import { findCssClassesLazy, findStoreLazy } from "@webpack";
 import {
     Alerts,
-    Button,
     ComponentDispatch,
     ContextMenuApi,
     createRoot,
@@ -32,6 +31,7 @@ import {
     useRef,
     useState,
 } from "@webpack/common";
+import { Button } from "@components/Button";
 
 const MAM_LABEL = "MAM";
 const MAM_TAB_ATTR = "data-vc-mam-tab";
