@@ -43,7 +43,8 @@
     min-width: 0;
     height: 32px;
     padding: 0 8px 0 10px;
-    border: 1px solid var(--input-border-default, var(--background-mod-strong, var(--background-modifier-accent)));
+    border: 1px solid
+        var(--input-border-default, var(--background-mod-strong, var(--background-modifier-accent)));
     border-radius: 8px;
     background: var(--input-background-default, var(--background-tertiary));
 }

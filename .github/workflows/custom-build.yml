@@ -1,87 +1,87 @@
 name: Build DevBuild (Fork)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/build.yml
-      - .github/workflows/custom-build.yml
-      - src/**
-      - browser/**
-      - scripts/build/**
-      - package.json
-      - pnpm-lock.yaml
+    push:
+        branches:
+            - main
+        paths:
+            - .github/workflows/build.yml
+            - .github/workflows/custom-build.yml
+            - src/**
+            - browser/**
+            - scripts/build/**
+            - package.json
+            - pnpm-lock.yaml
 
 env:
-  FORCE_COLOR: true
+    FORCE_COLOR: true
 
 permissions:
-  contents: write # required to create/edit releases + upload assets
+    contents: write # required to create/edit releases + upload assets
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6 # Install pnpm using packageManager key in package.json
+            - uses: pnpm/action-setup@v6 # Install pnpm using packageManager key in package.json
 
-      - name: Use Node.js 24
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: "pnpm"
+            - name: Use Node.js 24
+              uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: "pnpm"
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
 
-      - name: Build web
-        run: pnpm buildWebStandalone
+            - name: Build web
+              run: pnpm buildWebStandalone
 
-      - name: Build
-        run: pnpm build --standalone
+            - name: Build
+              run: pnpm build --standalone
 
-      - name: Generate plugin list
-        run: pnpm generatePluginJson dist/plugins.json dist/plugin-readmes.json
+            - name: Generate plugin list
+              run: pnpm generatePluginJson dist/plugins.json dist/plugin-readmes.json
 
-      - name: Clean up obsolete files
-        run: |
-          rm -rf dist/*-unpacked dist/vendor Vencord.user.css vencordDesktopRenderer.css vencordDesktopRenderer.css.map
+            - name: Clean up obsolete files
+              run: |
+                  rm -rf dist/*-unpacked dist/vendor Vencord.user.css vencordDesktopRenderer.css vencordDesktopRenderer.css.map
 
-      - name: Create release archives (zip + tar.gz)
-        run: |
-          set -euo pipefail
-          zip -r dist.zip dist
-          tar -czf dist.tar.gz dist
+            - name: Create release archives (zip + tar.gz)
+              run: |
+                  set -euo pipefail
+                  zip -r dist.zip dist
+                  tar -czf dist.tar.gz dist
 
-      - name: Compute release title/tag
-        id: rel
-        shell: bash
-        run: |
-          set -euo pipefail
-          SHORT_SHA="$(git rev-parse --short HEAD)"
-          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "tag=devbuild-$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "title=DevBuild $SHORT_SHA" >> "$GITHUB_OUTPUT"
+            - name: Compute release title/tag
+              id: rel
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  SHORT_SHA="$(git rev-parse --short HEAD)"
+                  echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+                  echo "tag=devbuild-$SHORT_SHA" >> "$GITHUB_OUTPUT"
+                  echo "title=DevBuild $SHORT_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Create a new release for this commit (unique tag)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.rel.outputs.tag }}
-          TITLE: ${{ steps.rel.outputs.title }}
-        run: |
-          set -euo pipefail
-          gh release create "$TAG" \
-            --title "$TITLE" \
-            --notes "Build from commit $GITHUB_SHA."
+            - name: Create a new release for this commit (unique tag)
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAG: ${{ steps.rel.outputs.tag }}
+                  TITLE: ${{ steps.rel.outputs.title }}
+              run: |
+                  set -euo pipefail
+                  gh release create "$TAG" \
+                    --title "$TITLE" \
+                    --notes "Build from commit $GITHUB_SHA."
 
-      - name: Upload DevBuild archives
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.rel.outputs.tag }}
-        run: |
-          set -euo pipefail
+            - name: Upload DevBuild archives
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAG: ${{ steps.rel.outputs.tag }}
+              run: |
+                  set -euo pipefail
 
-          # Upload packed dist files as well as each single file (because the stupid updater needs it that way >:c )
-          gh release upload "$TAG" dist.zip dist.tar.gz dist/*
+                  # Upload packed dist files as well as each single file (because the stupid updater needs it that way >:c )
+                  gh release upload "$TAG" dist.zip dist.tar.gz dist/*
