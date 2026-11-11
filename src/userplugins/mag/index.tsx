@@ -8,6 +8,7 @@ import "./style.css";
 
 import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { definePluginSettings } from "@api/Settings";
+import { Button } from "@components/Button";
 import { sendMessage } from "@utils/discord";
 import { relaunch } from "@utils/native";
 import definePlugin, { OptionType } from "@utils/types";
@@ -31,7 +32,6 @@ import {
     useRef,
     useState,
 } from "@webpack/common";
-import { Button } from "@components/Button";
 
 const MAM_LABEL = "MAM";
 const MAM_TAB_ATTR = "data-vc-mam-tab";
