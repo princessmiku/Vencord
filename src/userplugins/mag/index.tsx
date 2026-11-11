@@ -597,7 +597,7 @@ function MamView({ header }: { header: HTMLElement }) {
         (gif: MagGif) => {
             const channelId = SelectedChannelStore.getChannelId();
             if (!channelId) {
-                showToast("No channel selected.", "failure");
+                showToast({ text: "No channel selected.", variant: "critical" });
                 return;
             }
             const reply = PendingReplyStore.getPendingReply(channelId);
@@ -606,7 +606,7 @@ function MamView({ header }: { header: HTMLElement }) {
                 if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
                 void trackGifSend(gif.id, debouncedQuery, normalizedApiKey);
             }).catch(() => {
-                showToast("GIF could not be sent.", "failure");
+                showToast({ text: "GIF could not be sent.", variant: "critical" });
             });
             ExpressionPickerStore.closeExpressionPicker();
         },
@@ -765,7 +765,7 @@ function MamView({ header }: { header: HTMLElement }) {
                 <div style={{ padding: "0 12px 8px", color: "var(--status-danger)" }}>
                     {error}
                     {normalizedApiKey && !showCategories ? (
-                        <Button size={Button.Sizes.SMALL} onClick={() => loadNextRef.current?.()}>Erneut versuchen</Button>
+                        <Button size="small" onClick={() => loadNextRef.current?.()}>Erneut versuchen</Button>
                     ) : null}
                 </div>
             ) : null}
