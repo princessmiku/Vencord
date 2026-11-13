@@ -49,6 +49,8 @@ type MamRoot = { render: (node: React.ReactNode) => void; unmount: () => void };
 type MagGif = {
     id: number;
     public_url: string;
+    size_x?: number | null;
+    size_y?: number | null;
     nsfw?: boolean;
 };
 
@@ -343,27 +345,32 @@ function MasonryGrid({ items, onSend, onContextMenu, columnWidth = 140, gap = 8 
         for (const gif of items) {
             if (queuedIdsRef.current.has(gif.id)) continue;
             queuedIdsRef.current.add(gif.id);
+            const hasDimensions = typeof gif.size_x === "number" && Number.isFinite(gif.size_x) && gif.size_x > 0
+                && typeof gif.size_y === "number" && Number.isFinite(gif.size_y) && gif.size_y > 0;
+            const aspectRatio = hasDimensions ? gif.size_x! / gif.size_y! : 1;
             const shortestIndex = columnHeightsRef.current.indexOf(Math.min(...columnHeightsRef.current));
             const column = columns[shortestIndex];
-            columnHeightsRef.current[shortestIndex] += width + gap;
+            columnHeightsRef.current[shortestIndex] += width / aspectRatio + gap;
 
             const button = document.createElement("button");
             button.type = "button";
             button.dataset.mamGifId = String(gif.id);
-            button.style.cssText = "border:none;padding:0;background:var(--background-tertiary);cursor:pointer;display:block;width:100%;border-radius:6px;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 140px;";
+            button.style.cssText = "border:none;padding:0;background:var(--background-tertiary);cursor:pointer;display:block;width:100%;border-radius:6px;overflow:hidden;";
+            button.style.aspectRatio = String(aspectRatio);
             button.setAttribute("aria-label", "Send GIF");
             button.title = "Send GIF";
             const img = document.createElement("img");
             img.alt = "";
             img.loading = "lazy";
             img.decoding = "async";
-            img.style.cssText = "display:block;width:100%;height:auto;aspect-ratio:1;";
-            let measuredHeight = width;
+            img.style.cssText = "display:block;width:100%;height:100%;object-fit:contain;";
+            let measuredHeight = width / aspectRatio;
             img.onload = () => {
                 if (generation !== generationRef.current || !img.naturalWidth) return;
-                img.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
                 img.alt = "";
                 button.title = "Send GIF";
+                if (hasDimensions) return;
+                button.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
                 const height = width * img.naturalHeight / img.naturalWidth;
                 columnHeightsRef.current[shortestIndex] += height - measuredHeight;
                 measuredHeight = height;
